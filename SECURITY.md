@@ -2,7 +2,7 @@
 
 ## Deployment boundary
 
-NEXORA is a local operator interface and does not implement user authentication or authorization. Keep the server on loopback. Do not expose it to the internet or an untrusted LAN. Setting `ALLOW_REMOTE_HOST=true` does not secure the application.
+TrizEmpire is a local operator interface and does not implement user authentication or authorization. Keep the server on loopback. Do not expose it to the internet or an untrusted LAN. Setting `ALLOW_REMOTE_HOST=true` does not secure the application.
 
 The browser UI contacts a Hermes endpoint at `127.0.0.1:9119`; this is the visitor's own loopback interface when the UI is opened in a browser. Do not treat it as a secure remote API.
 
