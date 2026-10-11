@@ -293,8 +293,9 @@ body{
 .ws-card.hero-card .ws-row .ck{color:#fff}
 
 /* ───────── Agent City ───────── */
-.city{display:grid;grid-template-columns:320px 1fr;gap:0;height:calc(100vh - 89px);margin:-22px -26px -40px}
-.crew-list{border-right:1px solid var(--line);background:#0b0806;display:flex;flex-direction:column;min-height:0}
+/* ───────── Crew roster (own view) ───────── */
+.roster{height:calc(100vh - 89px);margin:-22px -26px -40px;display:flex}
+.crew-list{flex:1;border-right:1px solid var(--line);background:#0b0806;display:flex;flex-direction:column;min-height:0}
 .crew-search{padding:16px}
 .crew-search .box{display:flex;align-items:center;gap:9px;background:#150e08;border:1px solid var(--line);border-radius:10px;padding:9px 13px;color:var(--muted);font-size:12px}
 .crew-scroll{flex:1;overflow-y:auto;padding:0 10px 16px}
@@ -311,40 +312,46 @@ body{
 .crew-item .badge{background:var(--orange);color:#180d05;font-size:10px;font-weight:700;min-width:19px;height:19px;border-radius:999px;display:grid;place-items:center;padding:0 5px}
 .crew-item .badge.silent{background:#241811;color:var(--muted);font-family:var(--mono);font-size:8px;font-weight:500}
 
-.city-main{overflow-y:auto;padding:26px 30px}
-.city-head{font-family:var(--mono);font-size:11.5px;letter-spacing:.24em;color:var(--orange-2);margin-bottom:20px}
-.agent-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
-.agent-card{
-  border-radius:14px;overflow:hidden;position:relative;cursor:pointer;
-  border:1px solid #241811;background:#150e08;
-  aspect-ratio:3/3.4;
+/* ───────── Agent City — 3D orbital map ───────── */
+.city3d{position:relative;height:calc(100vh - 89px);margin:-22px -26px -40px;overflow:hidden}
+#city-canvas{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#city-canvas:active{cursor:grabbing}
+#city-labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.city-title{
+  position:absolute;top:20px;left:26px;z-index:3;display:flex;align-items:center;gap:10px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;color:var(--orange-2);
+  background:rgba(10,7,5,.7);border:1px solid var(--line-2);border-radius:999px;padding:9px 18px;
+  backdrop-filter:blur(6px);
 }
-.agent-card .portrait{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 8%,rgba(255,140,60,.18),transparent 55%),linear-gradient(180deg,#241811,#0f0906)}
-.agent-card .silh{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:74%;height:78%}
-.agent-card .name{
-  position:absolute;left:0;right:0;bottom:0;padding:11px 12px;
-  font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;color:var(--ink);text-align:center;
-  background:linear-gradient(180deg,transparent,rgba(8,5,3,.9) 55%);
+.city-title .blip{width:6px;height:6px;border-radius:50%;background:var(--orange);box-shadow:0 0 8px var(--orange);animation:pulse 2s infinite}
+.city-legend{
+  position:absolute;left:26px;bottom:22px;z-index:3;display:flex;gap:8px;flex-wrap:wrap;
+  background:rgba(10,7,5,.7);border:1px solid var(--line-2);border-radius:12px;padding:10px 14px;
+  backdrop-filter:blur(6px);
 }
-.agent-card.sel{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange),0 0 26px rgba(255,106,26,.28)}
-.agent-card.dim{opacity:.45}
-
-/* silhouette (suit + head) built from layered radial/linear gradients */
-.silh .head{
-  position:absolute;left:50%;top:6%;transform:translateX(-50%);
-  width:44%;padding-bottom:44%;border-radius:50% 50% 46% 46%;
-  background:radial-gradient(circle at 42% 30%,#2c2018,#0a0705 72%);
-  box-shadow:inset 0 6px 14px rgba(255,150,70,.12);
+.lg{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--muted)}
+.lg .d{width:8px;height:8px;border-radius:50%;box-shadow:0 0 8px currentColor;background:currentColor}
+.lg.working{color:#ff4d4d}.lg.ready{color:#3ddc84}.lg.idle{color:#4aa8ff}.lg.offline{color:#a06bff}
+.lg span{color:var(--muted)}
+.city-hint{
+  position:absolute;right:26px;bottom:22px;z-index:3;
+  font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--muted-2);
+  background:rgba(10,7,5,.7);border:1px solid var(--line-2);border-radius:999px;padding:9px 16px;
+  backdrop-filter:blur(6px);
 }
-.silh .neck{position:absolute;left:50%;top:44%;transform:translateX(-50%);width:16%;height:12%;background:#0d0906}
-.silh .suit{
-  position:absolute;left:50%;bottom:0;transform:translateX(-50%);
-  width:96%;height:46%;border-radius:44% 44% 0 0;
-  background:linear-gradient(180deg,#241a12,#0c0805);
-  box-shadow:inset 0 8px 18px rgba(255,150,70,.07);
+.city-label{
+  position:absolute;transform:translate(-50%,-100%);pointer-events:auto;cursor:pointer;
+  display:flex;align-items:center;gap:8px;white-space:nowrap;
+  background:#f6efe4;color:#181008;border-radius:9px;padding:6px 11px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;font-weight:700;
+  box-shadow:0 6px 18px rgba(0,0,0,.5);
+  transition:transform .12s, box-shadow .12s;
 }
-.silh .lapel{position:absolute;left:50%;top:0;transform:translateX(-50%);width:0;height:0;border-left:16px solid transparent;border-right:16px solid transparent;border-top:30px solid #0a0705}
-.silh .tie{position:absolute;left:50%;top:6%;transform:translateX(-50%);width:5px;height:34%;background:linear-gradient(180deg,var(--orange-dim),#3a1f0c);border-radius:2px}
+.city-label .d{width:8px;height:8px;border-radius:50%;flex-shrink:0;box-shadow:0 0 7px currentColor;background:currentColor}
+.city-label i{font-style:normal;font-weight:500;font-size:8.5px;letter-spacing:.16em;opacity:.62}
+.city-label.hub{background:var(--orange);color:#180d05}
+.city-label:hover,.city-label.hot{transform:translate(-50%,-100%) scale(1.08);box-shadow:0 8px 24px rgba(255,106,26,.35)}
+.city-label.dead{opacity:.55}
 
 .placeholder-view{display:grid;place-items:center;height:70vh;text-align:center}
 .placeholder-view .pv{max-width:440px}
@@ -365,9 +372,6 @@ body{
 .console-open:hover{border-color:var(--orange);color:var(--orange)}
 .console-frame{flex:1;border:0;width:100%;background:#0a0705}
 .console-loading{display:grid;place-items:center;flex:1;font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--muted)}
-.agent-card{cursor:pointer}
-.agent-card .open-h{position:absolute;top:8px;right:8px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--muted);background:rgba(10,7,5,.72);border:1px solid var(--line-2);border-radius:6px;padding:3px 7px;opacity:0;transition:opacity .12s}
-.agent-card:hover .open-h{opacity:1;color:var(--orange);border-color:var(--orange)}
 .crew-item .av .gp{position:absolute;right:-3px;bottom:-3px;width:15px;height:15px;border-radius:50%;background:var(--green);border:2px solid #0b0806;display:grid;place-items:center;font-size:8px;color:#04240f;font-weight:700}
 </style>
 </head>
@@ -384,6 +388,7 @@ body{
       <div class="nav-item" data-view="voice"><span class="ic">🎙</span>VOICE MODE</div>
       <div class="nav-item" data-view="hand"><span class="ic">✋</span>HAND MODE</div>
       <div class="nav-item" data-view="chat"><span class="ic">✻</span>CHAT</div>
+      <div class="nav-item" data-view="crew"><span class="ic">☰</span>CREW</div>
       <div class="nav-item" data-view="missions"><span class="ic">◎</span>MISSIONS</div>
       <div class="nav-item" data-view="docs"><span class="ic">▤</span>DOCS</div>
       <div class="nav-item" data-view="schedule"><span class="ic">▦</span>SCHEDULE</div>
@@ -480,20 +485,32 @@ body{
         </div>
       </section>
 
-      <!-- ─── AGENT CITY ─── -->
-      <section class="view" id="view-city">
-        <div class="city">
+      <!-- ─── CREW (chat roster) ─── -->
+      <section class="view" id="view-crew">
+        <div class="roster">
           <div class="crew-list">
             <div class="crew-search"><div class="box"><span>⌕</span>Search</div></div>
             <div class="crew-scroll">
-              <div class="crew-lbl">YOUR CREW</div>
+              <div class="crew-lbl">YOUR CREW · LIVE PROFILES</div>
               <div id="crew-items"></div>
             </div>
           </div>
-          <div class="city-main">
-            <div class="city-head" id="city-head">A WHOLE CREW</div>
-            <div class="agent-grid" id="agent-grid"></div>
+        </div>
+      </section>
+
+      <!-- ─── AGENT CITY (3D orbital status map) ─── -->
+      <section class="view" id="view-city">
+        <div class="city3d" id="city-3d">
+          <canvas id="city-canvas"></canvas>
+          <div id="city-labels"></div>
+          <div class="city-title"><span class="blip"></span>AGENT CITY · WHO'S BUSY</div>
+          <div class="city-legend">
+            <div class="lg working"><span class="d"></span><span>WORKING</span></div>
+            <div class="lg ready"><span class="d"></span><span>READY</span></div>
+            <div class="lg idle"><span class="d"></span><span>IDLE</span></div>
+            <div class="lg offline"><span class="d"></span><span>OFFLINE</span></div>
           </div>
+          <div class="city-hint">DRAG · ORBIT &nbsp;·&nbsp; SCROLL / PINCH · ZOOM &nbsp;·&nbsp; RIGHT-DRAG · PAN</div>
         </div>
       </section>
 
@@ -577,24 +594,6 @@ document.getElementById('crew-items').innerHTML = CREW.map((c,i)=>`
 }
 renderCrew();
 
-/* ══════ Render: agent grid ══════ */
-function silhouette(){return `<div class="silh"><div class="head"></div><div class="neck"></div><div class="suit"></div><div class="lapel"></div><div class="tie"></div></div>`;}
-function renderGrid(){
-document.getElementById('agent-grid').innerHTML = CREW.map(c=>`
-  <div class="agent-card ${c.active?'sel':''}" data-p="${c.profile}" title="Open ${c.name} in Hermes">
-    <div class="portrait"></div>
-    <span class="open-h">HERMES ↗</span>
-    ${silhouette()}
-    <div class="name">${c.name.toUpperCase()}</div>
-  </div>`).join('') + EXTRA_CARDS();
-}
-renderGrid();
-function EXTRA_CARDS(){
-  const more=[["EMAIL","#ffb03a"],["MARKETING","#ff6a1a"],["SEO","#2fd08a"],["SOCIAL","#3aa0ff"],["DESIGN","#b06aff"],["VIDEO","#ff5aa0"],["FINANCE","#2fd08a"],["SALES","#ff6a1a"],["SUPPORT","#7a6653",true]];
-  return more.map(([n,r,dim])=>`<div class="agent-card ${dim?'dim':''}"><div class="portrait"></div>${silhouette()}<div class="name">${n}</div></div>`).join('');
-}
-document.getElementById('city-head').textContent = `A WHOLE CREW · ${CREW.length + 9} AGENTS`;
-
 /* ══════ Cockpit numbers ══════ */
 const N = CREW.length;
 document.getElementById('hero-line').textContent = `a ${N}-agent engine.`;
@@ -648,6 +647,7 @@ async function loadHermes(){
 
     /* active sessions → odometer lifetime slot stays, but surface count */
     window.__hermesStatus = s;
+    window.City3D?.updateStatus?.(s);
   }catch(err){
     console.warn('Hermes backend unreachable:', err);
     markOffline();
@@ -655,6 +655,7 @@ async function loadHermes(){
 }
 
 function markOffline(){
+  window.City3D?.setOffline?.();
   const gw = document.querySelector('.hero .gateway');
   gw.childNodes[1].nodeValue = 'BACKEND OFFLINE';
   gw.style.borderColor = 'rgba(150,120,100,.4)'; gw.style.color = 'var(--muted)';
@@ -678,8 +679,8 @@ function rebuildCrew(profiles){
       active: i===0
     });
   });
-  renderCrew(); renderGrid(); buildProfilePicks();
-  document.getElementById('city-head').textContent = `A WHOLE CREW · ${CREW.length + 9} AGENTS`;
+  renderCrew(); buildProfilePicks();
+  window.City3D?.rebuild?.();
 }
 
 /* ══════ Hermes Console: embedded managing UI ══════ */
@@ -704,6 +705,11 @@ document.getElementById('profile-picks').addEventListener('click',e=>{
 
 /* deep link: open a profile's managing page in the Hermes dashboard */
 function openInHermes(profile){ window.open(consoleUrl(profile), '_blank', 'noopener'); }
+
+/* shared with the Agent City 3D module */
+window.NEXORA = { get CREW(){return CREW;}, HERMES_BASE, NICK, RINGS,
+  get currentProfile(){return currentProfile;}, set currentProfile(v){currentProfile=v;},
+  openInHermes };
 
 loadHermes(); setInterval(loadHermes, 15000);   /* refresh live state every 15s */
 
@@ -741,7 +747,7 @@ const PLACEHOLDER={
   guide:["GUIDE","Operator guide","How to run a multi-agent engine without babysitting it."],
   settings:["SETTINGS","System settings","Model, provider, tools and telemetry preferences."],
 };
-const views={cockpit:'view-cockpit',city:'view-city',console:'view-console'};
+const views={cockpit:'view-cockpit',crew:'view-crew',city:'view-city',console:'view-console'};
 document.getElementById('nav').addEventListener('click',e=>{
   const item=e.target.closest('.nav-item'); if(!item)return;
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -767,18 +773,351 @@ document.getElementById('crew-items').addEventListener('click',e=>{
   document.querySelectorAll('.crew-item').forEach(n=>n.classList.remove('active'));
   it.classList.add('active');
   const idx=+it.dataset.i, prof=it.dataset.p;
-  document.querySelectorAll('.agent-card').forEach((c,i)=>c.classList.toggle('sel',i===idx));
   if(prof){ currentProfile=prof; openInHermes(prof); }
+});
+</script>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+/* ══════ AGENT CITY — 3D orbital status map ══════
+   Every agent owns a building on a lit platform; the glowing ring under it
+   and the dot on its floating label show live status from the Hermes backend:
+     working (red) · ready (green) · idle (blue) · offline (purple)
+   Mouse: left-drag orbit · wheel zoom · right-drag pan.
+   Touch: one finger orbit · pinch zoom · two-finger pan. */
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const ST = {
+  working:{hex:0xff4d4d, css:'#ff4d4d', text:'WORKING'},
+  ready:  {hex:0x3ddc84, css:'#3ddc84', text:'READY'},
+  idle:   {hex:0x4aa8ff, css:'#4aa8ff', text:'IDLE'},
+  offline:{hex:0xa06bff, css:'#a06bff', text:'OFFLINE'},
+};
+
+const container = document.getElementById('city-3d');
+const canvas    = document.getElementById('city-canvas');
+const labelLayer= document.getElementById('city-labels');
+
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0705);
+scene.fog = new THREE.Fog(0x0b0705, 85, 170);
+
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
+camera.position.set(10, 52, 78);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 3, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance = 20;
+controls.maxDistance = 120;
+controls.maxPolarAngle = 1.32;
+controls.minPolarAngle = 0.18;
+
+/* lights */
+scene.add(new THREE.HemisphereLight(0xfff3e2, 0x14100b, 0.85));
+const sun = new THREE.DirectionalLight(0xffe9d2, 1.5);
+sun.position.set(34, 56, 22);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -70; sun.shadow.camera.right = 70;
+sun.shadow.camera.top = 70;  sun.shadow.camera.bottom = -70;
+scene.add(sun);
+const hubGlow = new THREE.PointLight(0xff6a1a, 28, 46, 2);
+hubGlow.position.set(0, 12, 0);
+scene.add(hubGlow);
+
+/* materials */
+const M = {
+  cream:   new THREE.MeshStandardMaterial({color:0xe9e2d6, roughness:0.55, metalness:0.04}),
+  cream2:  new THREE.MeshStandardMaterial({color:0xd8d0c2, roughness:0.6,  metalness:0.04}),
+  orange:  new THREE.MeshStandardMaterial({color:0xff6a1a, roughness:0.45, metalness:0.05, emissive:0x581f00, emissiveIntensity:0.55}),
+  road:    new THREE.MeshStandardMaterial({color:0x2b241d, roughness:0.9}),
+  ground:  new THREE.MeshStandardMaterial({color:0x17110c, roughness:0.95}),
+  bush:    new THREE.MeshStandardMaterial({color:0x2f2822, roughness:0.95}),
+};
+
+/* ground disc + ring road */
+const ground = new THREE.Mesh(new THREE.CylinderGeometry(64, 66, 1.2, 72), M.ground);
+ground.position.y = -0.6; ground.receiveShadow = true; scene.add(ground);
+const ringRoad = new THREE.Mesh(new THREE.TorusGeometry(26, 1.7, 12, 90), M.road);
+ringRoad.rotation.x = -Math.PI/2; ringRoad.position.y = 0.05; ringRoad.receiveShadow = true; scene.add(ringRoad);
+
+const city = new THREE.Group(); scene.add(city);
+const pods = [];           // {group, profile, ringMat, anchor, label, pulse, status}
+let statuses = {};
+
+/* status helpers */
+function computeStatuses(s, profiles){
+  const map = {};
+  if(!s || s.gateway_running !== true){
+    profiles.forEach(p => map[p] = 'offline');
+    return map;
+  }
+  const working = Math.min(Number(s.active_agents) || 0, profiles.length);
+  profiles.forEach((p,i) => map[p] = i < working ? 'working' : (working > 0 ? 'idle' : 'ready'));
+  return map;
+}
+
+function makeLabel(name, profile, hubFlag){
+  const el = document.createElement('div');
+  el.className = 'city-label' + (hubFlag ? ' hub' : '');
+  el.innerHTML = `<span class="d"></span><b>${name}</b><i>···</i>`;
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    if (profile) { window.NEXORA.currentProfile = profile; window.NEXORA.openInHermes(profile); }
+  });
+  labelLayer.appendChild(el);
+  return el;
+}
+
+function setStatusVisual(pod, key){
+  const st = ST[key] || ST.offline;
+  pod.ringMat.color.setHex(st.hex);
+  pod.ringMat.emissive.setHex(st.hex);
+  pod.ringMat.emissiveIntensity = key === 'working' ? 1.6 : 1.0;
+  if (pod.pulse) pod.pulse.material.color.setHex(st.hex);
+  pod.pulse.visible = key === 'working';
+  const dot = pod.label.querySelector('.d');
+  dot.style.color = st.css;
+  pod.label.querySelector('i').textContent = st.text;
+  pod.label.classList.toggle('dead', key === 'offline');
+  pod.status = key;
+}
+
+/* per-pod building shapes (variety like the reference city) */
+function building(kind){
+  const g = new THREE.Group();
+  const add = (mesh, y) => { mesh.position.y = y; mesh.castShadow = true; g.add(mesh); return mesh; };
+  if (kind === 0){            // dome observatory
+    add(new THREE.Mesh(new THREE.CylinderGeometry(3.4,3.8,2.4,28), M.cream), 1.2);
+    add(new THREE.Mesh(new THREE.SphereGeometry(3.2, 28, 16, 0, Math.PI*2, 0, Math.PI/2), M.cream), 2.4);
+    add(new THREE.Mesh(new THREE.TorusGeometry(3.25, .28, 10, 40), M.orange), 2.5).rotation.x = Math.PI/2;
+    add(new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,2.6,8), M.cream2), 6.2);
+  } else if (kind === 1){     // stacked discs
+    add(new THREE.Mesh(new THREE.CylinderGeometry(3.6,4.0,1.8,28), M.cream), .9);
+    add(new THREE.Mesh(new THREE.CylinderGeometry(3.0,3.2,1.6,28), M.cream2), 2.6);
+    add(new THREE.Mesh(new THREE.CylinderGeometry(2.3,2.5,1.5,28), M.cream), 4.2);
+    add(new THREE.Mesh(new THREE.TorusGeometry(2.55,.24,10,36), M.orange), 4.3).rotation.x = Math.PI/2;
+    add(new THREE.Mesh(new THREE.SphereGeometry(1.5,20,12,0,Math.PI*2,0,Math.PI/2), M.cream), 5.0);
+  } else if (kind === 2){     // tower blocks
+    add(new THREE.Mesh(new THREE.BoxGeometry(4.6,5.4,3.4), M.cream), 2.7);
+    add(new THREE.Mesh(new THREE.BoxGeometry(2.6,2.4,2.6), M.cream2), 6.6);
+    add(new THREE.Mesh(new THREE.BoxGeometry(4.7,.5,3.5), M.orange), 3.6);
+    add(new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,2.2,8), M.cream2), 8.8);
+  } else if (kind === 3){     // crystal citadel
+    add(new THREE.Mesh(new THREE.CylinderGeometry(3.2,3.6,2.0,28), M.cream), 1.0);
+    const crys = add(new THREE.Mesh(new THREE.IcosahedronGeometry(2.6, 0), M.cream), 4.4);
+    crys.rotation.y = Math.PI/5;
+    add(new THREE.Mesh(new THREE.TorusGeometry(3.3,.22,10,36), M.orange), 2.2).rotation.x = Math.PI/2;
+  } else {                    // striped silo
+    for (let i=0;i<4;i++){
+      const r = 3.4 - i*0.55;
+      add(new THREE.Mesh(new THREE.CylinderGeometry(r, r+0.18, 1.15, 26), i%2 ? M.cream2 : M.cream), .58 + i*1.2);
+    }
+    add(new THREE.Mesh(new THREE.TorusGeometry(2.0,.22,10,32), M.orange), 4.1).rotation.x = Math.PI/2;
+    add(new THREE.Mesh(new THREE.SphereGeometry(1.15,18,10,0,Math.PI*2,0,Math.PI/2), M.cream), 5.3);
+  }
+  return g;
+}
+
+function bushes(group, radius, count){
+  const geo = new THREE.SphereGeometry(0.42, 8, 6);
+  const inst = new THREE.InstancedMesh(geo, M.bush, count);
+  const m4 = new THREE.Matrix4();
+  for (let i=0;i<count;i++){
+    const a = (i/count)*Math.PI*2 + Math.random()*0.4;
+    const r = radius * (0.82 + Math.random()*0.14);
+    m4.makeScale(1, 0.8 + Math.random()*0.7, 1);
+    m4.setPosition(Math.cos(a)*r, 0.45, Math.sin(a)*r);
+    inst.setMatrixAt(i, m4);
+  }
+  inst.castShadow = true;
+  group.add(inst);
+}
+
+function road(fromR, toR, angle){
+  const len = toR - fromR;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.22, len), M.road);
+  const mid = fromR + len/2;
+  mesh.position.set(Math.cos(angle)*mid, 0.12, Math.sin(angle)*mid);
+  mesh.rotation.y = -angle + Math.PI/2;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function disposeGroup(g){
+  g.traverse(o => { if (o.isMesh){ o.geometry.dispose(); } });
+}
+
+/* ── hub (Executor HQ = the default profile) ── */
+function buildHub(name, profile){
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(8.5, 9.2, 1.1, 44), M.cream2);
+  base.position.y = 0.55; base.receiveShadow = true; base.castShadow = true; g.add(base);
+  const ringMat = new THREE.MeshStandardMaterial({color:0x3ddc84, emissive:0x3ddc84, emissiveIntensity:1, roughness:0.4});
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(8.8, 0.3, 12, 60), ringMat);
+  ring.rotation.x = Math.PI/2; ring.position.y = 1.15; g.add(ring);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.6, 13, 32), M.cream);
+  shaft.position.y = 7.6; shaft.castShadow = true; g.add(shaft);
+  for (let i=0;i<3;i++){
+    const band = new THREE.Mesh(new THREE.TorusGeometry(2.75 - i*0.12, 0.3, 10, 40), M.orange);
+    band.rotation.x = Math.PI/2; band.position.y = 4.2 + i*3.1; g.add(band);
+  }
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(2.1, 24, 14, 0, Math.PI*2, 0, Math.PI/2), M.cream);
+  cap.position.y = 14.1; cap.castShadow = true; g.add(cap);
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 4.2, 10), M.cream2);
+  mast.position.y = 17.4; g.add(mast);
+  const pulse = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10),
+    new THREE.MeshBasicMaterial({color:0xff4d4d}));
+  pulse.position.y = 19.7; g.add(pulse);
+  bushes(g, 7.6, 16);
+  city.add(g);
+  const label = makeLabel(name, profile, true);
+  const pod = {group:g, profile, ringMat, label, anchor:new THREE.Vector3(0, 21.5, 0), pulse, status:'offline'};
+  setStatusVisual(pod, 'offline');
+  return pod;
+}
+
+/* ── ring pod ── */
+function buildPod(name, profile, angle, kind){
+  const g = new THREE.Group();
+  g.position.set(Math.cos(angle)*38, 0, Math.sin(angle)*38);
+  const plat = new THREE.Mesh(new THREE.CylinderGeometry(9.2, 9.8, 0.9, 40), M.cream2);
+  plat.position.y = 0.45; plat.receiveShadow = true; plat.castShadow = true; g.add(plat);
+  const ringMat = new THREE.MeshStandardMaterial({color:0x3ddc84, emissive:0x3ddc84, emissiveIntensity:1, roughness:0.4});
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(9.45, 0.3, 12, 56), ringMat);
+  ring.rotation.x = Math.PI/2; ring.position.y = 0.95; g.add(ring);
+  const b = building(kind);
+  b.position.y = 0.9; g.add(b);
+  const pulse = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8),
+    new THREE.MeshBasicMaterial({color:0xff4d4d}));
+  pulse.position.y = 10.6; g.add(pulse);
+  bushes(g, 8.3, 14);
+  city.add(g);
+  city.add(road(9.4, 28.8, angle));
+  const label = makeLabel(name, profile, false);
+  const pod = {group:g, profile, ringMat, label, anchor:new THREE.Vector3(g.position.x, 12.4, g.position.z), pulse, status:'offline'};
+  setStatusVisual(pod, 'offline');
+  return pod;
+}
+
+function rebuild(){
+  pods.splice(0).forEach(p => { labelLayer.removeChild(p.label); });
+  disposeGroup(city);
+  city.clear();
+  const crew = (window.NEXORA && window.NEXORA.CREW) || [];
+  if (!crew.length) return;
+  const hubCrew = crew.find(c => c.profile === 'default') || crew[0];
+  pods.push(buildHub(hubCrew.name.toUpperCase(), hubCrew.profile));
+  const ring = crew.filter(c => c !== hubCrew);
+  ring.forEach((c, i) => {
+    const angle = (i / ring.length) * Math.PI * 2 - Math.PI/2 + Math.PI/ring.length;
+    pods.push(buildPod(c.name.toUpperCase(), c.profile, angle, i % 5));
+  });
+  applyStatuses();
+}
+
+function applyStatuses(){
+  pods.forEach(p => setStatusVisual(p, statuses[p.profile] || 'offline'));
+}
+
+function updateStatus(s){
+  const crew = (window.NEXORA && window.NEXORA.CREW) || [];
+  statuses = computeStatuses(s, crew.map(c => c.profile));
+  applyStatuses();
+}
+
+function setOffline(){
+  const crew = (window.NEXORA && window.NEXORA.CREW) || [];
+  statuses = computeStatuses(null, crew.map(c => c.profile));
+  applyStatuses();
+}
+
+window.City3D = { rebuild, updateStatus, setOffline };
+
+/* ── hover / click raycasting ── */
+const ray = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hotPod = null;
+canvas.addEventListener('pointermove', e => {
+  const r = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX - r.left)/r.width)*2 - 1;
+  mouse.y = -((e.clientY - r.top)/r.height)*2 + 1;
+  ray.setFromCamera(mouse, camera);
+  const hits = ray.intersectObjects(city.children, true);
+  const pod = hits.length ? pods.find(p => {
+    let o = hits[0].object; while (o){ if (o === p.group) return true; o = o.parent; } return false;
+  }) : null;
+  if (pod !== hotPod){
+    if (hotPod) hotPod.label.classList.remove('hot');
+    hotPod = pod || null;
+    if (hotPod) hotPod.label.classList.add('hot');
+    canvas.style.cursor = hotPod ? 'pointer' : 'grab';
+  }
+});
+canvas.addEventListener('click', () => {
+  if (!hotPod || !hotPod.profile) return;
+  window.NEXORA.currentProfile = hotPod.profile;
+  window.NEXORA.openInHermes(hotPod.profile);
 });
 
-/* agent grid → deep-link into Hermes */
-document.getElementById('agent-grid').addEventListener('click',e=>{
-  const card=e.target.closest('.agent-card'); if(!card)return;
-  const prof=card.dataset.p;
-  document.querySelectorAll('.agent-card').forEach(c=>c.classList.remove('sel'));
-  card.classList.add('sel');
-  if(prof){ currentProfile=prof; openInHermes(prof); }
-});
+/* ── label projection + render loop ── */
+const v = new THREE.Vector3();
+function placeLabels(){
+  const r = container.getBoundingClientRect();
+  pods.forEach(p => {
+    v.copy(p.anchor).project(camera);
+    const visible = v.z < 1;
+    p.label.style.display = visible ? 'flex' : 'none';
+    if (!visible) return;
+    p.label.style.left = ((v.x*0.5 + 0.5) * r.width) + 'px';
+    p.label.style.top  = ((-v.y*0.5 + 0.5) * r.height) + 'px';
+  });
+}
+
+function resize(){
+  const w = container.clientWidth, h = container.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(container);
+resize();
+
+const t0 = performance.now();
+function loop(){
+  requestAnimationFrame(loop);
+  if (!document.getElementById('view-city').classList.contains('active')) return;
+  controls.update();
+  const t = performance.now() - t0;
+  pods.forEach((p,i) => {
+    if (p.pulse.visible){
+      const k = 1 + 0.35*Math.sin(t/220 + i);
+      p.pulse.scale.setScalar(k);
+    }
+    p.ringMat.emissiveIntensity = p.status === 'working'
+      ? 1.1 + 0.5*Math.sin(t/300 + i) : 1.0;
+  });
+  placeLabels();
+  renderer.render(scene, camera);
+}
+loop();
+
+/* initial paint from whatever the cockpit already knows */
+rebuild();
+if (window.__hermesStatus) updateStatus(window.__hermesStatus); else setOffline();
 </script>
 </body>
 </html>
