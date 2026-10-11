@@ -97,23 +97,30 @@ function createServer({ root = ROOT } = {}) {
       return send(res, 404, 'Not found', undefined, req.method);
     }
 
-    fs.stat(filePath, (err, stat) => {
-      if (err || !stat.isFile()) return send(res, 404, 'Not found', undefined, req.method);
+    fs.realpath(filePath, (realErr, realPath) => {
+      // Also block symlinks that point outside the served directory.
+      if (realErr || (realPath !== safeRoot && !realPath.startsWith(safeRoot + path.sep))) {
+        return send(res, 404, 'Not found', undefined, req.method);
+      }
 
-      const type = MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
-      res.statusCode = 200;
-      res.setHeader('Content-Type', type);
-      res.setHeader('Content-Length', stat.size);
-      if (req.method === 'HEAD') return res.end();
+      fs.stat(realPath, (err, stat) => {
+        if (err || !stat.isFile()) return send(res, 404, 'Not found', undefined, req.method);
 
-      const stream = fs.createReadStream(filePath);
-      stream.on('error', () => {
-        if (!res.headersSent) send(res, 500, 'Internal server error');
-        else res.destroy();
+        const type = MIME[path.extname(realPath).toLowerCase()] || 'application/octet-stream';
+        res.statusCode = 200;
+        res.setHeader('Content-Type', type);
+        res.setHeader('Content-Length', stat.size);
+        if (req.method === 'HEAD') return res.end();
+
+        const stream = fs.createReadStream(realPath);
+        stream.on('error', () => {
+          if (!res.headersSent) send(res, 500, 'Internal server error');
+          else res.destroy();
+        });
+        stream.pipe(res);
+        // Log only method and pathname; do not write query strings that may contain secrets.
+        console.log(`${req.method} ${pathname} ${new Date().toISOString()}`);
       });
-      stream.pipe(res);
-      // Log only method and pathname; do not write query strings that may contain secrets.
-      console.log(`${req.method} ${pathname} ${new Date().toISOString()}`);
     });
   });
 }
