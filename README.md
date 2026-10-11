@@ -15,6 +15,7 @@ TrizEmpire is a Node.js operator interface for a local [Hermes](https://github.c
 - `nexora/scripts/` — `hash-password.js` (create password hashes), `check-syntax.js` (cross-platform syntax check).
 - `nexora/tests/` — automated test suite (`node:test`, no dependencies).
 - `.github/workflows/nexora-checks.yml` — Gitleaks + syntax + tests on Node 20/22/24.
+- `deploy/` — committed deployment bundle for a Linux host: hardened systemd unit (`trizempire.service`) and nginx TLS snippet (`trizempire-nginx.conf`).
 - `DEPLOYMENT.md` — production deployment guide.
 
 ## Requirements
@@ -54,9 +55,10 @@ Sign in as `admin` with the password you hashed. Optionally set `TRIZ_OPERATOR_P
 ```sh
 cd nexora
 npm run check     # syntax check across the project
-npm test          # 53 tests: server, auth, sessions, CSRF, rate limiting,
+npm test          # 63 tests: server, auth, sessions, CSRF, rate limiting,
                   # proxy states, traversal/symlink protection, headers,
                   # environment-config validation and .env hygiene,
+                  # deployment-bundle (systemd unit + nginx TLS) checks,
                   # plus a real-Hermes integration test (skips if Hermes is down)
 ```
 

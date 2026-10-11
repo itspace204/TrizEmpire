@@ -1,0 +1,72 @@
+# TrizEmpire (nexora) — systemd unit for a Linux host.
+#
+# Install:
+#   install -m 0644 deploy/trizempire.service /etc/systemd/system/trizempire.service
+#   systemd-analyze verify /etc/systemd/system/trizempire.service
+#   systemctl daemon-reload && systemctl enable --now trizempire
+#   journalctl -u trizempire -f
+#
+# Assumptions — adjust every one of them to your host:
+#   * app cloned at /opt/trizempire/nexora
+#   * node at /usr/bin/node            (confirm with: command -v node)
+#   * unprivileged user/group "nexora"  (useradd --system --home /opt/trizempire \
+#       --shell /usr/sbin/nologin nexora)
+#   * env file at /etc/trizempire/nexora.env (root-owned, chmod 0600)
+#
+# The env file uses systemd's EnvironmentFile syntax (KEY=value per line),
+# NOT shell syntax — no `export`, and values are literal, so the $ characters
+# in a scrypt TRIZ_*_PASSWORD_HASH are stored safely. It must contain at
+# least TRIZ_ADMIN_PASSWORD_HASH: NODE_ENV=production below makes the server
+# refuse to start without one. Anything set there overrides the Environment=
+# defaults below, and the whole process environment overrides a leftover
+# nexora/.env file.
+#
+# Deliberately absent:
+#   MemoryDenyWriteExecute=  breaks V8's JIT — Node will not start.
+#   PrivateNetwork=          would remove the listening socket.
+#   ProtectHome=false        not needed here; drop ProtectHome=true instead
+#                            if node or the app live under /home (nvm).
+
+[Unit]
+Description=TrizEmpire operator UI (nexora)
+Documentation=https://github.com/itspace204/TrizEmpire
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=nexora
+Group=nexora
+WorkingDirectory=/opt/trizempire/nexora
+EnvironmentFile=/etc/trizempire/nexora.env
+# Loopback + fixed port: this is exactly what deploy/trizempire-nginx.conf
+# proxies to, and production refuses PORT=0 (ephemeral ports are for tests).
+Environment=HOST=127.0.0.1
+Environment=PORT=57004
+Environment=NODE_ENV=production
+# Local console embed off by default: visitors' browsers cannot reach the
+# operator machine's 127.0.0.1:9119. Set HERMES_PUBLIC_URL in the env file
+# only when the dashboard is genuinely reachable from the browser.
+Environment=HERMES_PUBLIC_URL=
+ExecStart=/usr/bin/node /opt/trizempire/nexora/server.js
+Restart=on-failure
+RestartSec=2s
+StandardOutput=journal
+StandardError=journal
+UMask=0077
+
+# Sandboxing: the server writes nothing to disk (no database; logs go to the
+# journal), so the filesystem can be locked down completely.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

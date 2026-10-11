@@ -4,7 +4,9 @@
 
 TrizEmpire implements server-side authentication and authorization, but it is
 still an operator tool, not a public multi-user service. Follow
-[DEPLOYMENT.md](DEPLOYMENT.md) for a controlled deployment behind HTTPS.
+[DEPLOYMENT.md](DEPLOYMENT.md) for a controlled deployment behind HTTPS; it
+ships a hardened systemd unit and a TLS-terminating nginx snippet as a
+committed bundle in `deploy/`.
 
 Binding behavior:
 
@@ -56,7 +58,10 @@ sharing technical details.
 
 - Sessions and rate-limit state are in-memory (per process); running multiple
   replicas does not share them.
-- The server does not terminate TLS — use a reverse proxy (see DEPLOYMENT.md).
+- The server does not terminate TLS — use a reverse proxy; a ready-to-adapt
+  nginx TLS snippet ships in `deploy/trizempire-nginx.conf` (see DEPLOYMENT.md).
+  The bundle is validated structurally by tests, not executed in CI, so run
+  `systemd-analyze verify` and `nginx -t` on the target host.
 - The embedded Hermes console iframe is a **local-only** feature
   (`HERMES_PUBLIC_URL`); on remote deployments it must be disabled, which the
   UI enforces with an unavailable panel.

@@ -31,6 +31,92 @@ npm start         # starts server.js on 127.0.0.1:57004 by default
 
 There is no build step.
 
+## Deployment bundle (systemd + nginx)
+
+`deploy/` carries a committed deployment bundle for a Linux host:
+
+- [`deploy/trizempire.service`](deploy/trizempire.service) — hardened systemd
+  unit: dedicated unprivileged `nexora` user, direct `node` invocation (no npm
+  wrapper), loopback bind on `HOST=127.0.0.1`/`PORT=57004`,
+  `NODE_ENV=production`, journal logging, and sandboxing that is safe for V8's
+  JIT (deliberately **no** `MemoryDenyWriteExecute=`, which would stop Node
+  from starting).
+- [`deploy/trizempire-nginx.conf`](deploy/trizempire-nginx.conf) — nginx
+  server blocks for ports 80 and 443: Let's Encrypt webroot, HTTP→HTTPS
+  redirect, the Mozilla "intermediate" TLS policy (TLS 1.2 + 1.3, AEAD
+  ciphers), HSTS, and the `Host`/`X-Forwarded-Proto` headers the app's CSRF
+  origin check depends on.
+
+The unit's `HOST`/`PORT` and the snippet's `proxy_pass` target are pinned to
+match each other (and to the app's defaults) by `nexora/tests/deploy.test.js`,
+which also checks the TLS policy, the proxy headers and the sandbox directives.
+Adjust both files together if you change the port or hostname.
+
+### Install the service
+
+```sh
+# 1. App and runtime (adjust the paths if your node or clone live elsewhere)
+sudo useradd --system --home /opt/trizempire --shell /usr/sbin/nologin nexora
+sudo git clone https://github.com/itspace204/TrizEmpire.git /opt/trizempire
+command -v node                    # must be /usr/bin/node, or edit ExecStart
+
+# 2. Secrets: systemd EnvironmentFile syntax — KEY=value, no `export`.
+#    Values are literal, so the $ characters in a scrypt hash are safe.
+cd /opt/trizempire/nexora
+node scripts/hash-password.js      # type the admin password; prints scrypt$…
+sudo install -d -m 0755 /etc/trizempire
+sudoedit /etc/trizempire/nexora.env    # TRIZ_ADMIN_PASSWORD_HASH='scrypt$…'
+sudo chmod 0600 /etc/trizempire/nexora.env
+
+# 3. Unit
+sudo install -m 0644 deploy/trizempire.service /etc/systemd/system/trizempire.service
+sudo systemd-analyze verify /etc/systemd/system/trizempire.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now trizempire
+
+# 4. Verify
+systemctl status trizempire --no-pager
+curl -fsS http://127.0.0.1:57004/healthz      # {"status":"ok"}
+journalctl -u trizempire -n 50 --no-pager     # startup banner + config errors
+```
+
+The unit expects Node at `/usr/bin/node`; if yours is elsewhere (nvm), edit
+`ExecStart` — and note that nvm installs live under `/home`, so you must also
+drop `ProtectHome=true` or systemd will hide the binary from the service.
+Because `Environment=` sets `NODE_ENV=production`, the service will refuse to
+start until `TRIZ_ADMIN_PASSWORD_HASH` is in the env file; the journal names
+the missing variable (never a value). On a server, also set
+`HERMES_PUBLIC_URL=` (already the unit's default) unless the Hermes dashboard
+is genuinely reachable from visitors' browsers.
+
+### Install the TLS proxy
+
+nginx cannot start before the certificate exists, so the snippet is enabled in
+two passes:
+
+```sh
+# 1. Copy the config and, for now, comment out the whole "port 443: TLS"
+#    server block — its ssl_certificate files do not exist yet.
+sudo cp deploy/trizempire-nginx.conf /etc/nginx/sites-available/trizempire.conf
+sudo ln -s /etc/nginx/sites-available/trizempire.conf /etc/nginx/sites-enabled/
+sudo mkdir -p /var/www/certbot/.well-known/acme-challenge
+sudo nginx -t && sudo systemctl reload nginx
+
+# 2. Issue the certificate (webroot matches the config's ACME location).
+sudo certbot certonly --webroot -w /var/www/certbot -d triz.example.internal
+
+# 3. Uncomment the "port 443: TLS" server block again, then:
+sudo nginx -t && sudo systemctl reload nginx
+curl -fsSI https://triz.example.internal/healthz   # 200 + HSTS header
+certbot renew --dry-run                           # renewal is automated
+```
+
+Replace `triz.example.internal` (four occurrences in the snippet) with your
+hostname first. `certbot --nginx` is a workable alternative, but it rewrites
+the config itself — keep the `Host` and `X-Forwarded-Proto` proxy headers if
+you merge. HSTS is included with a two-year `max-age`; leave it commented out
+on a first rollout until HTTPS is verified, and do not add `preload`.
+
 ## Environment variables
 
 All configuration is via environment variables. The canonical template is
@@ -116,18 +202,27 @@ The app reads the operating-system environment, so any platform works:
 ```sh
 cd nexora
 npm start        # foreground; Ctrl+C stops the server
+
+# on a Linux host with the deployment bundle installed:
+sudo systemctl {start|stop|restart|status} trizempire
+journalctl -u trizempire -f
 ```
 
 There is no database and no background daemon: stopping the process is a
 clean stop, and sessions/rate-limit state reset on restart. For unattended
-runs use your platform's process manager (systemd unit, container restart
-policy) rather than a shell background job.
+runs use your platform's process manager — [`deploy/trizempire.service`](deploy/trizempire.service)
+for systemd, or a container restart policy — rather than a shell background
+job.
 
 ## HTTPS and reverse proxy
 
 Terminate TLS in your reverse proxy and forward to the app on loopback.
 The proxy should also set/forward `Host` correctly: CSRF protection compares
 the `Origin`/`Referer` header against the request `Host`.
+
+A complete, tested-by-CI nginx configuration ships as
+[`deploy/trizempire-nginx.conf`](deploy/trizempire-nginx.conf) (install steps
+above). The minimal shape any other proxy (Caddy, Traefik, …) must match:
 
 Example (nginx):
 
@@ -236,14 +331,17 @@ to `main` and every pull request.
   scrypt+session authentication, CSRF, login rate limiting (in-memory),
   server-side Hermes status proxy with normalized states, health endpoints,
   startup environment validation with secret-safe errors, the full UI
-  (cockpit, crew command center, 3D Agent City, local console embed), 53
-  automated tests including a real-Hermes integration test that skips when
-  Hermes is not running.
+  (cockpit, crew command center, 3D Agent City, local console embed), 63
+  automated tests including the deployment-bundle checks and a real-Hermes
+  integration test that skips when Hermes is not running.
 - **Partially implemented:** per-agent working/idle coloring derives from
   global backend signals (`gateway_running`, `active_agents`); Hermes'
   per-profile endpoints require upstream credentials that are not configured.
   Rate limiting and sessions are per-process (not shared across replicas).
-- **Planned / blocked:** HTTPS termination (reverse proxy required), persistent
+  The systemd unit and nginx snippet are committed as a bundle but are
+  validated structurally by tests, not by `systemd-analyze verify`/`nginx -t`
+  in CI — run both on the target host as shown above.
+- **Planned / blocked:** persistent
   audit storage, multi-user administration UI, real per-agent activity data
   (needs authenticated Hermes access), and the placeholder nav modules
   (Voice, Hand, Chat, Missions, Docs, Schedule, Health, Files, Terminal,
