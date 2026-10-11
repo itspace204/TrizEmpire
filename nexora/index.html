@@ -449,7 +449,7 @@ body{
                 </svg>
                 <div class="ring-inner">
                   <div class="cap">MISSION CONTROL</div>
-                  <div class="num" id="total-runs">0</div>
+                  <div class="num" id="total-runs">—</div>
                   <div class="sub">TOTAL RUNS</div>
                 </div>
               </div>
@@ -598,11 +598,12 @@ document.getElementById('city-head').textContent = `A WHOLE CREW · ${CREW.lengt
 /* ══════ Cockpit numbers ══════ */
 const N = CREW.length;
 document.getElementById('hero-line').textContent = `a ${N}-agent engine.`;
-document.getElementById('total-runs').textContent = '140';
-document.getElementById('odo-a').textContent = String(N).padStart(2,'0');
-document.getElementById('odo-b').textContent = '140';
-document.getElementById('success-rate').textContent = '98.6%';
-document.getElementById('avg-time').textContent = '5.9';
+// Do not present placeholder numbers as live operational telemetry.
+document.getElementById('total-runs').textContent = '—';
+document.getElementById('odo-a').textContent = '—';
+document.getElementById('odo-b').textContent = '—';
+document.getElementById('success-rate').textContent = '—';
+document.getElementById('avg-time').textContent = '—';
 
 /* ══════ LIVE HERMES CONNECTION ══════
    Talks to the Hermes backend's public /api/status endpoint (CORS-open, no auth).
@@ -716,8 +717,18 @@ function spark(id,seed){
 spark('spark-1',1); spark('spark-2',4);
 
 /* meters */
-function setMeter(fillId,valId,pct){document.getElementById(fillId).style.width=pct+'%';document.getElementById(valId).textContent=pct+'%';}
-setMeter('f-cpu','m-cpu',34); setMeter('f-ram','m-ram',41); setMeter('f-disk','m-disk',67);
+function setMeter(fillId,valId,pct){
+  const safePct = Math.max(0, Math.min(100, Number(pct) || 0));
+  document.getElementById(fillId).style.width=safePct+'%';
+  document.getElementById(valId).textContent=safePct+'%';
+}
+function setMeterUnavailable(fillId,valId){
+  document.getElementById(fillId).style.width='0%';
+  document.getElementById(valId).textContent='—';
+}
+setMeterUnavailable('f-cpu','m-cpu');
+setMeterUnavailable('f-ram','m-ram');
+setMeterUnavailable('f-disk','m-disk');
 
 /* ══════ Live Berlin clock ══════ */
 function tick(){
