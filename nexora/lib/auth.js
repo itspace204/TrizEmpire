@@ -205,6 +205,7 @@ function hasCsrfHeader(req) {
 module.exports = {
   hashPassword,
   verifyPassword,
+  parseHash,
   usersFromEnv,
   verifyCredentials,
   SessionStore,

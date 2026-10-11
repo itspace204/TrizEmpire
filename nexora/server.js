@@ -16,9 +16,10 @@ const path = require('node:path');
 
 const { applySecurityHeaders } = require('./lib/security');
 const {
-  usersFromEnv, verifyCredentials, SessionStore, RateLimiter,
+  verifyCredentials, SessionStore, RateLimiter,
   parseCookies, sessionCookie, clearedCookie, isSameOrigin, hasCsrfHeader,
 } = require('./lib/auth');
+const { loadEnvFile, resolveConfig } = require('./lib/config');
 const hermesProxy = require('./lib/hermes');
 
 const DEFAULT_ROOT = __dirname;
@@ -89,44 +90,16 @@ function clientKey(req) {
 }
 
 function resolveOptions(options = {}, env = process.env) {
-  const port = options.port !== undefined ? Number(options.port) : Number(env.PORT || 57004);
-  // 0 selects an ephemeral port (Node convention; useful for tests and CI).
-  if (!Number.isInteger(port) || port < 0 || port > 65535) {
-    throw new Error('PORT must be an integer between 0 and 65535 (0 = ephemeral).');
-  }
-  const host = options.host || env.HOST || '127.0.0.1';
-  const users = options.users !== undefined ? options.users : usersFromEnv(env);
-  const authRequired = users.length > 0;
-  const loopbackHosts = new Set(['127.0.0.1', '::1', 'localhost']);
-  const remoteAllowed = env.ALLOW_REMOTE_HOST === 'true' || options.allowRemoteHost === true;
-  if (!loopbackHosts.has(host)) {
-    if (!remoteAllowed) {
-      throw new Error('Refusing non-loopback HOST. Set ALLOW_REMOTE_HOST=true only if you understand this server has no authentication.');
-    }
-    if (!authRequired) {
-      throw new Error('Refusing non-loopback bind without authentication. Configure TRIZ_ADMIN_PASSWORD_HASH (see scripts/hash-password.js) first.');
-    }
-  }
-  return {
-    root: options.root || DEFAULT_ROOT,
-    host,
-    port,
-    users,
-    authRequired,
-    secureCookies: options.secureCookies !== undefined ? options.secureCookies
-      : (env.NODE_ENV === 'production' || env.TRIZ_SECURE_COOKIE === 'true'),
-    sessions: options.sessions || new SessionStore({
-      idleMs: (Number(env.TRIZ_SESSION_TTL_MINUTES) || 480) * 60 * 1000,
-      absoluteMs: (Number(env.TRIZ_SESSION_ABS_MINUTES) || 1440) * 60 * 1000,
-    }),
-    loginLimiter: options.loginLimiter || new RateLimiter({ max: 5, windowMs: 15 * 60 * 1000 }),
-    statusLimiter: options.statusLimiter || new RateLimiter({ max: 120, windowMs: 60 * 1000 }),
-    hermesBaseUrl: options.hermesBaseUrl || env.HERMES_BASE_URL || 'http://127.0.0.1:9119',
-    hermesPublicUrl: options.hermesPublicUrl !== undefined ? options.hermesPublicUrl
-      : (env.HERMES_PUBLIC_URL !== undefined ? env.HERMES_PUBLIC_URL : 'http://127.0.0.1:9119'),
-    hermesTimeoutMs: options.hermesTimeoutMs !== undefined ? Number(options.hermesTimeoutMs)
-      : (Number(env.HERMES_TIMEOUT_MS) || hermesProxy.DEFAULT_TIMEOUT_MS),
-  };
+  const cfg = resolveConfig(options, env);
+  cfg.sessions = options.sessions || new SessionStore({
+    idleMs: cfg.sessionIdleMs,
+    absoluteMs: cfg.sessionAbsoluteMs,
+  });
+  cfg.loginLimiter = options.loginLimiter || new RateLimiter({ max: 5, windowMs: 15 * 60 * 1000 });
+  cfg.statusLimiter = options.statusLimiter || new RateLimiter({ max: 120, windowMs: 60 * 1000 });
+  delete cfg.sessionIdleMs;
+  delete cfg.sessionAbsoluteMs;
+  return cfg;
 }
 
 function createServer(options = {}) {
@@ -339,12 +312,15 @@ function createServer(options = {}) {
 }
 
 if (require.main === module) {
+  /* Load nexora/.env if present (OS env always wins over the file). */
+  const loadedEnv = loadEnvFile(path.join(DEFAULT_ROOT, '.env'));
   const cfg = resolveOptions();
   const server = createServer();
   server.listen(cfg.port, cfg.host, () => {
     const bound = server.address().port;
     console.log(`TrizEmpire serving local files from ${DEFAULT_ROOT}`);
     console.log(`  http://${cfg.host}:${bound}/`);
+    if (loadedEnv.length) console.log(`  Loaded .env (${loadedEnv.length} variables; OS environment takes precedence)`);
     console.log(cfg.authRequired
       ? `  Authentication: enabled (${cfg.users.map(u => u.username).join(', ')})`
       : '  Authentication: DISABLED — loopback-only mode. Set TRIZ_ADMIN_PASSWORD_HASH to enable login.');

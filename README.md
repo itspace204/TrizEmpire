@@ -26,36 +26,46 @@ TrizEmpire is a Node.js operator interface for a local [Hermes](https://github.c
 
 ```sh
 cd nexora
+cp .env.example .env    # optional: local defaults; edit as needed
 npm start                # http://127.0.0.1:57004
 ```
 
 No `npm install` is required — the server uses only Node.js built-ins and serves a vendored Three.js.
+
+### Configuration (`.env`)
+
+All configuration is via environment variables; [nexora/.env.example](nexora/.env.example) documents every variable the code actually reads. The server loads `nexora/.env` at startup (plain `npm start`); variables already set in the operating-system environment always win over the file. `.env` is gitignored — copy the template, never commit your copy. The full variable table, validation rules and hosting guidance are in [DEPLOYMENT.md](DEPLOYMENT.md).
+
+The server validates configuration at startup and fails fast with a clear message (variable name, never the value): invalid ports, malformed URLs, unknown `NODE_ENV`, and — in production — missing authentication or `PORT=0` are all rejected before the first request.
 
 ### Enable login (required for any remote exposure)
 
 ```sh
 cd nexora
 node scripts/hash-password.js        # paste password on stdin; prints scrypt hash
-TRIZ_ADMIN_PASSWORD_HASH='scrypt$…' npm start
+# put the printed hash in .env as TRIZ_ADMIN_PASSWORD_HASH='scrypt$…'
+npm start
 ```
 
-Sign in as `admin` with the password you hashed. Optionally set `TRIZ_OPERATOR_PASSWORD_HASH` for a second, non-admin account.
+Sign in as `admin` with the password you hashed. Optionally set `TRIZ_OPERATOR_PASSWORD_HASH` for a second, non-admin account. There is no default password: without a hash the server runs in loopback-only local mode, and `NODE_ENV=production` refuses to start without one.
 
 ## Checks and tests
 
 ```sh
 cd nexora
 npm run check     # syntax check across the project
-npm test          # 29 tests: server, auth, sessions, CSRF, rate limiting,
+npm test          # 53 tests: server, auth, sessions, CSRF, rate limiting,
                   # proxy states, traversal/symlink protection, headers,
+                  # environment-config validation and .env hygiene,
                   # plus a real-Hermes integration test (skips if Hermes is down)
 ```
 
 ## Configuration
 
-All via environment variables — full table in [DEPLOYMENT.md](DEPLOYMENT.md). Highlights:
+All via environment variables — template in [nexora/.env.example](nexora/.env.example), full table in [DEPLOYMENT.md](DEPLOYMENT.md). Highlights:
 
 - `HOST` defaults to `127.0.0.1`; non-loopback binds require `ALLOW_REMOTE_HOST=true` **and** configured auth.
+- `NODE_ENV=production` requires `TRIZ_ADMIN_PASSWORD_HASH` and a fixed `PORT` — the server refuses to start otherwise.
 - `HERMES_BASE_URL` — server-side upstream (fixed `/api/status` path only; never an open proxy).
 - `HERMES_PUBLIC_URL` — console-embed URL for the operator's own machine; set empty on remote deployments (the UI then shows an unavailable panel).
 - `NODE_ENV=production` — `Secure` session cookies.

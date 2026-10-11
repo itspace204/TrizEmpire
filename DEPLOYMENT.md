@@ -33,22 +33,51 @@ There is no build step.
 
 ## Environment variables
 
-All configuration is via environment variables. Placeholder values only —
-never commit real values.
+All configuration is via environment variables. The canonical template is
+[`nexora/.env.example`](nexora/.env.example) — copy it to `nexora/.env` and
+edit the copy. Placeholder values only — never commit real values.
+
+Loading semantics:
+
+- The server loads `nexora/.env` at startup (plain `npm start`).
+- Variables already set in the operating-system environment **always take
+  precedence** over the file — process managers and hosting platforms win.
+- `.env` is gitignored; `.env.example` is tracked. Verify with
+  `git check-ignore nexora/.env`.
+- There is no `.env` loading during tests: test configuration is injected
+  explicitly, so suites stay hermetic.
+
+Startup validation (in `nexora/lib/config.js`) fails fast with the variable
+name — never the value — when:
+
+- `PORT` is not an integer 0–65535, or is `0` while `NODE_ENV=production`
+  (ephemeral ports are for tests/CI only; deployments need a fixed port).
+- `NODE_ENV` is set to anything other than `development`, `test`, `production`.
+- `HOST` is non-loopback without `ALLOW_REMOTE_HOST=true` **and** configured
+  authentication (unchanged from earlier releases).
+- `NODE_ENV=production` without `TRIZ_ADMIN_PASSWORD_HASH` — **production
+  can never start without authentication; there is no default password.**
+- A `TRIZ_*_PASSWORD_HASH` value is not a valid scrypt hash.
+- `HERMES_BASE_URL` / `HERMES_PUBLIC_URL` are not valid http(s) URLs, or
+  contain embedded credentials (`user:pass@`) — the proxy has no
+  upstream-auth support and URLs are handed to browsers, so secrets must not
+  travel in them.
+- `TRIZ_SESSION_TTL_MINUTES`, `TRIZ_SESSION_ABS_MINUTES` or
+  `HERMES_TIMEOUT_MS` are non-integer or non-positive.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PORT` | `57004` | TCP port (`0` = ephemeral). |
+| `NODE_ENV` | unset | `production` enables `Secure` session cookies **and requires authentication**. `development`/`test` are recognized; any other value is rejected. |
+| `PORT` | `57004` | TCP port (`0` = ephemeral, local/test only; rejected in production). |
 | `HOST` | `127.0.0.1` | Bind address. Non-loopback binds require `ALLOW_REMOTE_HOST=true` **and** configured authentication, otherwise the server refuses to start. |
 | `ALLOW_REMOTE_HOST` | unset | Explicit opt-in for non-loopback binds. Not authentication. |
-| `TRIZ_ADMIN_PASSWORD_HASH` | unset | scrypt hash for the `admin` account (role `admin`). Enabling this turns authentication on. |
+| `TRIZ_ADMIN_PASSWORD_HASH` | unset | scrypt hash for the `admin` account (role `admin`). Enabling this turns authentication on; **required in production**. |
 | `TRIZ_OPERATOR_PASSWORD_HASH` | unset | scrypt hash for the `operator` account (role `operator`). |
 | `TRIZ_SESSION_TTL_MINUTES` | `480` | Session idle timeout. |
 | `TRIZ_SESSION_ABS_MINUTES` | `1440` | Session absolute lifetime. |
-| `NODE_ENV` | unset | `production` enables `Secure` session cookies. |
 | `TRIZ_SECURE_COOKIE` | unset | `true` forces `Secure` cookies without full production mode. |
-| `HERMES_BASE_URL` | `http://127.0.0.1:9119` | Server-side upstream for live status. Only the fixed `/api/status` path is ever fetched. |
-| `HERMES_PUBLIC_URL` | `http://127.0.0.1:9119` | URL handed to browsers for the **local-only** embedded console. Set to empty (`HERMES_PUBLIC_URL=`) on remote deployments. |
+| `HERMES_BASE_URL` | `http://127.0.0.1:9119` | Server-side upstream for live status. Only the fixed `/api/status` path is ever fetched — it can never become an open proxy. No credentials in the URL. |
+| `HERMES_PUBLIC_URL` | `http://127.0.0.1:9119` | URL handed to browsers for the **local-only** embedded console. Set to empty (`HERMES_PUBLIC_URL=`) on remote deployments. No credentials in the URL. |
 | `HERMES_TIMEOUT_MS` | `3000` | Per-attempt upstream timeout (one retry on network errors). |
 
 ### Creating password hashes
@@ -56,11 +85,43 @@ never commit real values.
 ```sh
 cd nexora
 node scripts/hash-password.js      # reads the password from stdin, prints the hash
-# export TRIZ_ADMIN_PASSWORD_HASH='scrypt$16384$8$1$…'
+# put the printed value in nexora/.env:
+#   TRIZ_ADMIN_PASSWORD_HASH='scrypt$16384$8$1$…'
 ```
 
+Keep the hash out of Git: it lives only in your private `.env` (gitignored)
+or your hosting platform's secret store. Never paste it into a chat, issue,
+or log.
+
 No default credentials exist. If no hashes are configured, the server runs in
-**loopback-only local mode** without login and says so at startup.
+**loopback-only local mode** without login and says so at startup — but
+`NODE_ENV=production` refuses to start in that state.
+
+### Configuring variables on a hosting platform
+
+The app reads the operating-system environment, so any platform works:
+
+- **systemd**: put values in an `EnvironmentFile=` path pointing at a root-
+  owned copy of your `.env` (mode `0600`), or individual `Environment=` lines.
+- **Docker**: pass `-e`/`--env-file` flags or orchestrator secrets; do not
+  bake `.env` into images (it is gitignored, keep it that way in build
+  contexts too).
+- **PaaS (Render, Railway, Fly.io, …)**: set the variables in the dashboard's
+  secrets/env UI; do not upload `.env` as a file.
+- In every case set `NODE_ENV=production`, a fixed `PORT` (match the
+  platform's expected port), and `TRIZ_ADMIN_PASSWORD_HASH`.
+
+### Starting and stopping
+
+```sh
+cd nexora
+npm start        # foreground; Ctrl+C stops the server
+```
+
+There is no database and no background daemon: stopping the process is a
+clean stop, and sessions/rate-limit state reset on restart. For unattended
+runs use your platform's process manager (systemd unit, container restart
+policy) rather than a shell background job.
 
 ## HTTPS and reverse proxy
 
@@ -140,6 +201,29 @@ git revert <bad-commit>   # or check out the previous known-good tag
 cd nexora && npm run check && npm test && npm start
 ```
 
+## Credential rotation and configuration mistakes
+
+- **Rotate a password**: run `node scripts/hash-password.js`, replace the
+  hash in `.env` (or the platform secret store), restart. In-flight sessions
+  survive until idle/absolute expiry; to cut them off immediately, restart the
+  process (session state is in-memory) — or temporarily set
+  `TRIZ_SESSION_TTL_MINUTES=1` and restart twice.
+- **A secret was committed**: rotate it first (a scrypt hash in Git still
+  shouldn't stay there — generate a new password). Then remove it from
+  history with `git filter-repo` and force-push only if you accept the
+  history rewrite; otherwise treat it as burned. GitHub-secret scanning and
+  the repo's Gitleaks CI help catch the next one.
+- **A secret leaked in a log or screenshot**: rotate the corresponding
+  credential. The server's own logs never contain hashes, passwords, cookies
+  or query strings — startup errors name the *variable*, never the value —
+  so leaks come from the surrounding tooling, not the app.
+- **Bad configuration at startup**: the server exits non-zero with a message
+  naming the offending variable (for example a typo'd `NODE_ENV` or a
+  malformed URL). Fix the variable and restart; nothing was written to disk.
+- **Test a production config locally** without exposing anything:
+  `NODE_ENV=production TRIZ_ADMIN_PASSWORD_HASH='scrypt$…' npm start` still
+  binds loopback unless `ALLOW_REMOTE_HOST=true` is also set.
+
 ## CI
 
 `.github/workflows/nexora-checks.yml` runs Gitleaks secret scanning plus
@@ -151,9 +235,10 @@ to `main` and every pull request.
 - **Implemented and verified:** static delivery with CSP/security headers,
   scrypt+session authentication, CSRF, login rate limiting (in-memory),
   server-side Hermes status proxy with normalized states, health endpoints,
-  the full UI (cockpit, crew, 3D Agent City, local console embed), 29 automated
-  tests including a real-Hermes integration test that skips when Hermes is not
-  running.
+  startup environment validation with secret-safe errors, the full UI
+  (cockpit, crew command center, 3D Agent City, local console embed), 53
+  automated tests including a real-Hermes integration test that skips when
+  Hermes is not running.
 - **Partially implemented:** per-agent working/idle coloring derives from
   global backend signals (`gateway_running`, `active_agents`); Hermes'
   per-profile endpoints require upstream credentials that are not configured.
