@@ -31,5 +31,5 @@ Every app on this machine starts from this folder so it is Node.js compatible by
 - **`npm start` must always work.** Every app exposes a `start` script so it can be
   launched the same way everywhere.
 - **Localhost bind.** Servers bind `127.0.0.1` unless there is a stated reason not to.
-- Real example in use: `../nexora/` serves the NEXORA operator UI on port 57004 with
+- Real example in use: `../trizempire/` serves the TrizEmpire operator UI on port 57004 with
   this same server file.

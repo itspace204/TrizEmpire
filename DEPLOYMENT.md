@@ -15,7 +15,7 @@ is speculative. Items that are **not yet implemented** are called out under
 ## Runtime requirements
 
 - No `npm install` step: the server uses only Node.js built-in modules and
-  serves a vendored copy of Three.js (MIT, see `nexora/vendor/THREE-LICENSE.txt`).
+  serves a vendored copy of Three.js (MIT, see `trizempire/vendor/THREE-LICENSE.txt`).
 - The Hermes backend (optional but required for live telemetry) must be
   reachable **from the TrizEmpire server**, not from visitors' browsers.
 
@@ -23,7 +23,7 @@ is speculative. Items that are **not yet implemented** are called out under
 
 ```sh
 git clone https://github.com/itspace204/TrizEmpire.git
-cd TrizEmpire/nexora
+cd TrizEmpire/trizempire
 npm run check     # syntax check over all project JS
 npm test          # automated test suite (node:test)
 npm start         # starts server.js on 127.0.0.1:57004 by default
@@ -54,7 +54,7 @@ never commit real values.
 ### Creating password hashes
 
 ```sh
-cd nexora
+cd trizempire
 node scripts/hash-password.js      # reads the password from stdin, prints the hash
 # export TRIZ_ADMIN_PASSWORD_HASH='scrypt$16384$8$1$…'
 ```
@@ -137,12 +137,12 @@ browser ── same-origin ──▶ TrizEmpire server ── HERMES_BASE_URL �
 
 ```sh
 git revert <bad-commit>   # or check out the previous known-good tag
-cd nexora && npm run check && npm test && npm start
+cd trizempire && npm run check && npm test && npm start
 ```
 
 ## CI
 
-`.github/workflows/nexora-checks.yml` runs Gitleaks secret scanning plus
+`.github/workflows/trizempire-checks.yml` runs Gitleaks secret scanning plus
 syntax checks and the full test suite on Node.js 20, 22 and 24 for every push
 to `main` and every pull request.
 
