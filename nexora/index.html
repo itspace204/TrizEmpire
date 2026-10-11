@@ -131,7 +131,8 @@ body{
 .clock{text-align:right;line-height:1.2;flex:0 0 auto}
 .clock .clock-city{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:#9c8b74}
 .clock .time{font-family:var(--mono);font-size:17px;font-weight:500;color:#171009;letter-spacing:.04em}
-.user-chip{display:flex;align-items:center;gap:10px;flex:0 0 auto;background:#fff;border:1px solid #ddd0bb;border-radius:999px;padding:5px 6px 5px 6px}
+.user-chip{display:flex;align-items:center;gap:10px;flex:0 0 auto;background:#fff;border:1px solid #ddd0bb;border-radius:999px;padding:5px 6px 5px 6px;cursor:pointer}
+.user-chip:hover{background:#fdfaf4}
 .user-chip .av{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3a2a1c,#120b06);border:1px solid #cdbfa9}
 .user-chip .meta{line-height:1.15;padding-right:8px}
 .user-chip .meta b{font-size:12px;color:#171009;font-weight:600;display:block}
@@ -372,10 +373,35 @@ body{
 .console-open:hover{border-color:var(--orange);color:var(--orange)}
 .console-frame{flex:1;border:0;width:100%;background:#0a0705}
 .console-loading{display:grid;place-items:center;flex:1;font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--muted)}
+.console-bar .conn{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--muted);border:1px solid var(--line-2);border-radius:999px;padding:5px 12px;white-space:nowrap}
+.console-unavailable{flex:1;display:grid;place-items:center;text-align:center;padding:30px}
+.console-unavailable .cu-state{font-family:var(--mono);font-size:13px;letter-spacing:.26em;color:var(--orange-2)}
+.console-unavailable .cu-body{color:var(--muted);font-size:12.5px;line-height:1.7;max-width:440px;margin-top:12px}
+
+/* ───────── Auth overlay ───────── */
+.auth-overlay{position:fixed;inset:0;z-index:50;background:rgba(8,5,3,.92);backdrop-filter:blur(8px);display:none;place-items:center}
+.auth-card{width:min(340px,90vw);background:#150e08;border:1px solid var(--line-2);border-radius:16px;padding:30px 28px;display:flex;flex-direction:column;gap:12px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.auth-card .auth-title{font-family:var(--serif);font-size:30px;color:var(--cream);text-align:center}
+.auth-card .auth-sub{font-family:var(--mono);font-size:9px;letter-spacing:.28em;color:var(--muted-2);text-align:center;margin-top:-8px;margin-bottom:10px}
+.auth-card input{background:#0e0906;border:1px solid var(--line-2);border-radius:9px;padding:11px 13px;color:var(--ink);font-family:var(--mono);font-size:12px;outline:none}
+.auth-card input:focus{border-color:var(--orange)}
+.auth-card button{background:var(--orange);color:#180d05;border:0;border-radius:9px;padding:11px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.18em;cursor:pointer}
+.auth-card button:hover{background:var(--orange-2)}
+.auth-err{min-height:16px;font-size:11px;color:#ff6a6a;text-align:center}
 .crew-item .av .gp{position:absolute;right:-3px;bottom:-3px;width:15px;height:15px;border-radius:50%;background:var(--green);border:2px solid #0b0806;display:grid;place-items:center;font-size:8px;color:#04240f;font-weight:700}
 </style>
 </head>
 <body>
+<div class="auth-overlay" id="auth-overlay">
+  <form class="auth-card" id="auth-form" autocomplete="on">
+    <div class="auth-title">TrizEmpire</div>
+    <div class="auth-sub">OPERATOR SIGN-IN</div>
+    <input id="auth-user" name="username" autocomplete="username" placeholder="Username" required />
+    <input id="auth-pass" name="password" type="password" autocomplete="current-password" placeholder="Password" required />
+    <button type="submit">SIGN IN</button>
+    <div class="auth-err" id="auth-err" role="alert"></div>
+  </form>
+</div>
 <div class="app">
   <!-- ═══ Sidebar ═══ -->
   <aside class="sidebar">
@@ -417,7 +443,7 @@ body{
       <div class="pill-btn">👋 Hand cursor</div>
       <div class="pill-btn">⛶ Full screen</div>
       <div class="clock"><div class="clock-city">BERLIN</div><div class="time" id="clock">--:--:--</div></div>
-      <div class="user-chip"><div class="av"></div><div class="meta"><b>Larry</b><span>OPERATOR</span></div></div>
+      <div class="user-chip" id="user-chip" title="Sign out"><div class="av"></div><div class="meta"><b id="op-name">Larry</b><span id="op-role">OPERATOR</span></div></div>
     </header>
 
     <div class="viewport" id="viewport">
@@ -519,11 +545,18 @@ body{
         <div class="console-wrap">
           <div class="console-bar">
             <span class="ct">HERMES MANAGING UI · LIVE</span>
+            <span class="conn" id="conn-state">CONNECTING…</span>
             <div class="profile-picks" id="profile-picks"></div>
             <span class="sep"></span>
             <a class="console-open" id="console-open" href="http://127.0.0.1:9119/sessions?profile=default" target="_blank" rel="noopener">OPEN IN NEW TAB ↗</a>
           </div>
           <div class="console-loading" id="console-loading">LOADING HERMES CONSOLE…</div>
+          <div class="console-unavailable" id="console-unavailable" style="display:none">
+            <div>
+              <div class="cu-state" id="cu-state">CONSOLE UNAVAILABLE</div>
+              <div class="cu-body" id="cu-body"></div>
+            </div>
+          </div>
           <iframe class="console-frame" id="console-frame" style="display:none" title="Hermes managing UI"></iframe>
         </div>
       </section>
@@ -604,63 +637,88 @@ document.getElementById('odo-b').textContent = '—';
 document.getElementById('success-rate').textContent = '—';
 document.getElementById('avg-time').textContent = '—';
 
-/* ══════ LIVE HERMES CONNECTION ══════
-   Talks to the Hermes backend's public /api/status endpoint (CORS-open, no auth).
-   Pulls the real profile list, gateway state and disk usage; and drives the
-   embedded managing UI (Console view) + per-agent deep links. */
-const HERMES_BASE = 'http://127.0.0.1:9119';
+/* ══════ SERVER CONFIG + LIVE HERMES CONNECTION ══════
+   The browser only talks to this server. /api/hermes/status is a
+   server-side proxy to the operator's Hermes backend, so the UI never
+   assumes 127.0.0.1:9119 means the visitor's own machine. */
+const CFG = { hermesPublicUrl: null, authRequired: false };
+let hermesState = 'connecting';   // connecting | connected | disconnected | error
+let HERMES_BASE = 'http://127.0.0.1:9119';  // local-only console embed, from server config
 const RINGS = {default:'#ff6a1a',research:'#3aa0ff',writer:'#b06aff',developer:'#2fd08a',data:'#ff5aa0'};
 const NICK  = {default:'Orchestrator',research:'Research',writer:'Writer',developer:'Developer',data:'Data'};
 let LIVE_PROFILES = CREW.map(c=>c.profile);
 let currentProfile = 'default';
 
-async function loadHermes(){
-  try{
-    const r = await fetch(HERMES_BASE + '/api/status', {cache:'no-store'});
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const s = await r.json();
-
-    /* real crew list */
-    if(Array.isArray(s.profiles) && s.profiles.length){
-      LIVE_PROFILES = s.profiles;
-      rebuildCrew(s.profiles);
-      const n = s.profiles.length;
-      document.getElementById('hero-line').textContent = `a ${n}-agent engine.`;
-    }
-
-    /* gateway state → hero pill + sidebar */
-    const up = !!s.gateway_running;
-    const gw = document.querySelector('.hero .gateway');
-    gw.childNodes[1].nodeValue = up ? 'GATEWAY UP' : 'GATEWAY DOWN';
-    gw.style.borderColor = up ? 'rgba(255,106,26,.5)' : 'rgba(150,120,100,.4)';
-    gw.style.color = up ? 'var(--orange-2)' : 'var(--muted)';
-
-    /* live system status text */
-    const ov = s.overall || 'unknown';
-    const chip = document.querySelector('.status-chip');
-    chip.childNodes[1].nodeValue = 'System status: ' + ov.charAt(0).toUpperCase()+ov.slice(1);
-
-    /* Only render disk telemetry when the backend returns a numeric value. CPU/RAM remain unavailable. */
-    if(s.disk && typeof s.disk.used_percent === 'number'){
-      setMeter('f-disk','m-disk', Math.round(s.disk.used_percent));
-    }
-
-    /* active sessions → odometer lifetime slot stays, but surface count */
-    window.__hermesStatus = s;
-    window.City3D?.updateStatus?.(s);
-  }catch(err){
-    console.warn('Hermes backend unreachable:', err);
-    markOffline();
-  }
+function setConnChip(state){
+  const el = document.getElementById('conn-state');
+  if(!el) return;
+  const map = {
+    connecting:  ['CONNECTING…', 'var(--muted)'],
+    connected:   ['LIVE · CONNECTED', '#3ddc84'],
+    disconnected:['DISCONNECTED', '#a06bff'],
+    error:       ['UPSTREAM ERROR', '#ff4d4d'],
+  };
+  const [text,color] = map[state] || map.connecting;
+  el.textContent = text; el.style.color = color; el.style.borderColor = color;
 }
 
-function markOffline(){
+async function loadHermes(){
+  let r;
+  try{
+    r = await fetch('/api/hermes/status', {cache:'no-store'});
+  }catch{
+    hermesState = 'error'; setConnChip(hermesState);
+    markOffline('TrizEmpire server unreachable');
+    return;
+  }
+  if(r.status === 401){ showLogin(); return; }
+  let body = null;
+  try{ body = await r.json(); }catch{}
+  if(!body || body.ok !== true){
+    hermesState = (body && body.state) || 'error';
+    setConnChip(hermesState);
+    markOffline(hermesState === 'disconnected' ? 'Hermes backend unreachable' : 'Hermes upstream error');
+    return;
+  }
+  hermesState = 'connected'; setConnChip(hermesState);
+  const s = body.status;
+
+  /* real crew list */
+  if(Array.isArray(s.profiles) && s.profiles.length){
+    LIVE_PROFILES = s.profiles;
+    rebuildCrew(s.profiles);
+    const n = s.profiles.length;
+    document.getElementById('hero-line').textContent = `a ${n}-agent engine.`;
+  }
+
+  /* gateway state → hero pill + sidebar */
+  const up = !!s.gateway_running;
+  const gw = document.querySelector('.hero .gateway');
+  gw.childNodes[1].nodeValue = up ? 'GATEWAY UP' : 'GATEWAY DOWN';
+  gw.style.borderColor = up ? 'rgba(255,106,26,.5)' : 'rgba(150,120,100,.4)';
+  gw.style.color = up ? 'var(--orange-2)' : 'var(--muted)';
+
+  /* live system status text */
+  const ov = s.overall || 'unknown';
+  const chip = document.querySelector('.status-chip');
+  chip.childNodes[1].nodeValue = 'System status: ' + ov.charAt(0).toUpperCase()+ov.slice(1);
+
+  /* Only render disk telemetry when the backend returns a numeric value. CPU/RAM remain unavailable. */
+  if(s.disk && typeof s.disk.used_percent === 'number'){
+    setMeter('f-disk','m-disk', Math.round(s.disk.used_percent));
+  }
+
+  window.__hermesStatus = s;
+  window.City3D?.updateStatus?.(s);
+}
+
+function markOffline(reason){
   window.City3D?.setOffline?.();
   const gw = document.querySelector('.hero .gateway');
   gw.childNodes[1].nodeValue = 'BACKEND OFFLINE';
   gw.style.borderColor = 'rgba(150,120,100,.4)'; gw.style.color = 'var(--muted)';
   const chip = document.querySelector('.status-chip');
-  chip.childNodes[1].nodeValue = 'System status: Hermes offline';
+  chip.childNodes[1].nodeValue = 'System status: ' + (reason || 'Hermes offline');
 }
 
 /* rebuild crew + grid from the real profile list returned by the backend */
@@ -683,43 +741,145 @@ function rebuildCrew(profiles){
   window.City3D?.rebuild?.();
 }
 
-/* ══════ Hermes Console: embedded managing UI ══════ */
+/* ══════ Hermes Console: embedded managing UI (local-only feature) ══════
+   The embed iframe points at HERMES_PUBLIC_URL, which only resolves when the
+   browser runs on the same machine as Hermes. When it is not configured or
+   the backend is not reachable, the view shows an honest unavailable state. */
 function consoleUrl(profile){ return `${HERMES_BASE}/sessions?profile=${encodeURIComponent(profile)}`; }
 function buildProfilePicks(){
   const el = document.getElementById('profile-picks');
   el.innerHTML = LIVE_PROFILES.map(p=>`<button class="profile-pick ${p===currentProfile?'on':''}" data-p="${p}">${(NICK[p]||p).toUpperCase()}</button>`).join('');
 }
+function showConsoleUnavailable(){
+  const f = document.getElementById('console-frame');
+  const l = document.getElementById('console-loading');
+  const u = document.getElementById('console-unavailable');
+  f.style.display='none'; l.style.display='none'; u.style.display='grid';
+  const title = document.getElementById('cu-state');
+  const body  = document.getElementById('cu-body');
+  if(!CFG.hermesPublicUrl){
+    title.textContent = 'CONSOLE UNAVAILABLE';
+    body.textContent = 'The embedded Hermes console only works on the operator machine. HERMES_PUBLIC_URL is not configured on this server.';
+  } else if(hermesState === 'connecting'){
+    title.textContent = 'CONNECTING…';
+    body.textContent = 'Waiting for the Hermes connection state.';
+  } else if(hermesState === 'connected'){
+    title.textContent = 'CONSOLE UNAVAILABLE';
+    body.textContent = 'The Hermes dashboard did not respond. Open it in a new tab to investigate.';
+  } else {
+    title.textContent = 'HERMES DISCONNECTED';
+    body.textContent = 'The server cannot reach the Hermes backend right now. The console returns when the connection is restored.';
+  }
+}
 function loadConsole(profile){
   currentProfile = profile;
   const f = document.getElementById('console-frame');
   const l = document.getElementById('console-loading');
-  document.getElementById('console-open').href = consoleUrl(profile);
+  const u = document.getElementById('console-unavailable');
+  const open = document.getElementById('console-open');
+  document.querySelectorAll('.profile-pick').forEach(b=>b.classList.toggle('on', b.dataset.p===profile));
+  if(!CFG.hermesPublicUrl || hermesState !== 'connected'){
+    open.style.display = 'none';
+    showConsoleUnavailable();
+    return;
+  }
+  open.style.display = '';
+  open.href = consoleUrl(profile);
+  u.style.display = 'none';
   f.style.display='none'; l.style.display='grid'; l.textContent = `LOADING ${profile.toUpperCase()}…`;
   f.onload = ()=>{ l.style.display='none'; f.style.display='block'; };
   f.src = consoleUrl(profile);
-  document.querySelectorAll('.profile-pick').forEach(b=>b.classList.toggle('on', b.dataset.p===profile));
 }
 document.getElementById('profile-picks').addEventListener('click',e=>{
   const b=e.target.closest('.profile-pick'); if(b) loadConsole(b.dataset.p);
 });
 
-/* deep link: open a profile's managing page in the Hermes dashboard */
-function openInHermes(profile){ window.open(consoleUrl(profile), '_blank', 'noopener'); }
+/* deep link: open a profile's managing page in the Hermes dashboard.
+   Without a public Hermes URL this falls back to the Console view's
+   unavailable explanation instead of opening a dead tab. */
+function openInHermes(profile){
+  if(!CFG.hermesPublicUrl){
+    document.querySelector('.nav-item[data-view="console"]').click();
+    return;
+  }
+  window.open(consoleUrl(profile), '_blank', 'noopener');
+}
 
 /* shared with the Agent City 3D module */
-window.NEXORA = { get CREW(){return CREW;}, HERMES_BASE, NICK, RINGS,
+window.NEXORA = { get CREW(){return CREW;}, get HERMES_BASE(){return HERMES_BASE;}, NICK, RINGS,
   get currentProfile(){return currentProfile;}, set currentProfile(v){currentProfile=v;},
   openInHermes };
 
-loadHermes(); setInterval(loadHermes, 15000);   /* refresh live state every 15s */
+/* Sparkline containers stay hidden: there is no real time-series data source
+ * yet, and fabricated lines must not be presented as telemetry. */
+document.querySelectorAll('.spark').forEach(el=>{ el.style.display='none'; });
 
-/* sparklines */
-function spark(id,seed){
-  const pts=[];let v=22+ (seed%7);
-  for(let i=0;i<=30;i++){v+=(Math.sin(i*0.9+seed)*4)+(Math.random()*6-3);v=Math.max(6,Math.min(38,v));pts.push(`${i*10},${44-v}`);}
-  document.getElementById(id).setAttribute('points',pts.join(' '));
+/* ══════ AUTH + BOOT ══════ */
+const authOverlay = document.getElementById('auth-overlay');
+function showLogin(){
+  authOverlay.style.display = 'grid';
+  document.getElementById('auth-user').focus();
 }
-spark('spark-1',1); spark('spark-2',4);
+function hideLogin(){ authOverlay.style.display = 'none'; }
+function setOperator(name, role){
+  document.getElementById('op-name').textContent = name || 'Larry';
+  document.getElementById('op-role').textContent = String(role || 'operator').toUpperCase();
+}
+
+document.getElementById('auth-form').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const err = document.getElementById('auth-err');
+  err.textContent = '';
+  const username = document.getElementById('auth-user').value.trim();
+  const password = document.getElementById('auth-pass').value;
+  try{
+    const r = await fetch('/api/auth/login', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({username, password}),
+    });
+    const b = await r.json().catch(()=>({}));
+    if(!r.ok){
+      err.textContent = r.status === 429
+        ? 'Too many attempts — wait before trying again.'
+        : (b.error === 'invalid_credentials' ? 'Invalid username or password.' : 'Sign-in failed.');
+      return;
+    }
+    document.getElementById('auth-pass').value = '';
+    hideLogin();
+    setOperator(b.user, b.role);
+    startLive();
+  }catch{
+    err.textContent = 'Cannot reach the TrizEmpire server.';
+  }
+});
+
+document.getElementById('user-chip').addEventListener('click', async ()=>{
+  if(!CFG.authRequired) return;
+  if(!confirm('Sign out of TrizEmpire?')) return;
+  await fetch('/api/auth/logout', {method:'POST', headers:{'x-triz-csrf':'1'}}).catch(()=>{});
+  showLogin();
+});
+
+function startLive(){
+  loadHermes();
+  setInterval(loadHermes, 15000);   /* refresh live state every 15s */
+}
+
+async function boot(){
+  try{
+    const c = await (await fetch('/api/config')).json();
+    CFG.hermesPublicUrl = c.hermesPublicUrl;
+    CFG.authRequired = !!(c.auth && c.auth.required);
+    if(c.hermesPublicUrl) HERMES_BASE = c.hermesPublicUrl;
+  }catch{ /* config unavailable: defaults stay, loadHermes reports the failure */ }
+  if(CFG.authRequired){
+    const s = await (await fetch('/api/auth/session')).json().catch(()=>({authenticated:false}));
+    if(!s.authenticated){ showLogin(); return; }
+    setOperator(s.user, s.role);
+  }
+  startLive();
+}
+boot();
 
 /* meters */
 function setMeter(fillId,valId,pct){
