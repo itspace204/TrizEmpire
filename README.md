@@ -60,4 +60,4 @@ These use Node's built-in syntax checker and test runner.
 
 ## License
 
-The project owner has stated that the implementation is original and reference images were used for visual direction. Before adding a public license, ensure the images, fonts, icons, and any other third-party assets have compatible terms. The repository remains `UNLICENSED` until the owner selects and approves a license.
+Original TrizEmpire project code is licensed under the MIT License; see [LICENSE](LICENSE). The owner has stated that the implementation is original and reference images were used for visual direction. The MIT license applies to the project's original code, not to third-party fonts, icons, libraries, or assets that may carry their own terms. Verify and preserve those separate licenses and attributions where applicable.
