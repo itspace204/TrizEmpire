@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEXORA — Operator System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#0c0806;
+  --bg-2:#100b08;
+  --panel:#171009;
+  --panel-2:#1c130c;
+  --line:#2a1d13;
+  --line-2:#3a281a;
+  --orange:#ff6a1a;
+  --orange-2:#ff8a3d;
+  --orange-dim:#c8541a;
+  --cream:#f6efe4;
+  --cream-2:#efe6d6;
+  --ink:#efe4d6;
+  --muted:#a08a76;
+  --muted-2:#7a6653;
+  --green:#4ade80;
+  --sans:'Inter',system-ui,-apple-system,sans-serif;
+  --serif:'Instrument Serif',Georgia,'Times New Roman',serif;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --sb:236px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--sans);
+  background:var(--bg);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2c1e14;border-radius:6px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#3d2a1b}
+
+.app{display:flex;height:100vh;width:100%}
+
+/* ───────── Sidebar ───────── */
+.sidebar{
+  width:var(--sb);min-width:var(--sb);
+  background:#0a0705;
+  border-right:1px solid var(--line);
+  display:flex;flex-direction:column;
+  position:relative;
+}
+.brand{
+  display:flex;align-items:center;gap:12px;
+  padding:20px 22px 22px;
+}
+.brand .mark{
+  width:38px;height:38px;border-radius:9px;
+  background:linear-gradient(150deg,#241811,#160e08);
+  border:1px solid var(--line-2);
+  display:grid;place-items:center;
+  font-family:var(--serif);font-size:22px;color:var(--cream);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+.brand .txt{display:flex;flex-direction:column;line-height:1}
+.brand .txt b{font-family:var(--sans);font-weight:700;font-size:14px;letter-spacing:.16em;color:var(--cream)}
+.brand .txt span{font-family:var(--mono);font-size:8.5px;letter-spacing:.28em;color:var(--muted-2);margin-top:5px}
+
+.nav{flex:1;overflow-y:auto;padding:6px 14px 14px}
+.nav-group-label{
+  font-family:var(--mono);font-size:9px;letter-spacing:.24em;color:var(--muted-2);
+  padding:16px 10px 8px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:12px;
+  padding:9px 11px;margin:2px 0;border-radius:8px;
+  color:var(--muted);cursor:pointer;position:relative;
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em;
+  border:1px solid transparent;
+  transition:background .12s,color .12s;
+  user-select:none;
+}
+.nav-item .ic{width:16px;text-align:center;font-size:12px;opacity:.85}
+.nav-item:hover{background:#160e08;color:var(--ink)}
+.nav-item.active{
+  color:var(--cream);background:#1b1109;border-color:#2e1d10;
+}
+.nav-item.active::before{
+  content:"";position:absolute;left:-14px;top:50%;transform:translateY(-50%);
+  width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--orange);
+}
+.nav-item.active .dot{
+  position:absolute;right:11px;width:6px;height:6px;border-radius:50%;
+  background:var(--orange);box-shadow:0 0 8px var(--orange);
+}
+.sidebar-foot{
+  padding:14px 20px;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--muted-2);
+  display:flex;justify-content:space-between;
+}
+
+/* ───────── Main ───────── */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+
+.topbar{
+  background:var(--cream);color:#1a130c;
+  padding:13px 24px;display:flex;align-items:center;gap:16px;flex-wrap:nowrap;
+  border-bottom:1px solid #dcd0bc;flex:0 0 auto;
+}
+.topbar .greet{flex:0 0 auto;min-width:0}
+.topbar .greet h1{font-family:var(--serif);font-size:25px;font-weight:400;color:#171009;letter-spacing:.01em;white-space:nowrap}
+.topbar .greet p{font-size:11.5px;color:#7c6a55;margin-top:2px;white-space:nowrap}
+.topbar .spacer{flex:1 1 auto;min-width:8px}
+.search{
+  display:flex;align-items:center;gap:9px;flex:0 1 auto;
+  background:#fff;border:1px solid #ddd0bb;border-radius:999px;
+  padding:8px 14px;min-width:150px;max-width:260px;color:#9c8b74;font-size:12px;
+  box-shadow:0 1px 2px rgba(0,0,0,.03);white-space:nowrap;overflow:hidden;
+}
+.search .kbd{margin-left:auto;font-family:var(--mono);font-size:10px;color:#b0a08a;border:1px solid #e0d4c1;border-radius:5px;padding:1px 6px}
+.pill-btn{
+  display:flex;align-items:center;gap:7px;flex:0 0 auto;
+  background:#fff;border:1px solid #ddd0bb;border-radius:999px;
+  padding:8px 14px;font-size:12px;color:#3a2c1c;cursor:pointer;white-space:nowrap;
+  box-shadow:0 1px 2px rgba(0,0,0,.03);
+}
+.pill-btn:hover{background:#fdfaf4}
+.clock{text-align:right;line-height:1.2;flex:0 0 auto}
+.clock .clock-city{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:#9c8b74}
+.clock .time{font-family:var(--mono);font-size:17px;font-weight:500;color:#171009;letter-spacing:.04em}
+.user-chip{display:flex;align-items:center;gap:10px;flex:0 0 auto;background:#fff;border:1px solid #ddd0bb;border-radius:999px;padding:5px 6px 5px 6px}
+.user-chip .av{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3a2a1c,#120b06);border:1px solid #cdbfa9}
+.user-chip .meta{line-height:1.15;padding-right:8px}
+.user-chip .meta b{font-size:12px;color:#171009;font-weight:600;display:block}
+.user-chip .meta span{font-family:var(--mono);font-size:8px;letter-spacing:.18em;color:#9c8b74}
+
+.viewport{
+  flex:1;overflow-y:auto;position:relative;
+  padding:22px 26px 40px;
+  background:
+    radial-gradient(900px 420px at 78% -8%,rgba(255,106,26,.10),transparent 60%),
+    radial-gradient(700px 500px at 12% 110%,rgba(255,106,26,.05),transparent 60%),
+    var(--bg);
+}
+.viewport::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:radial-gradient(rgba(255,255,255,.028) 1px,transparent 1px);
+  background-size:22px 22px;opacity:.5;
+}
+.view{display:none;position:relative;z-index:1}
+.view.active{display:block}
+
+/* ───────── Hero ───────── */
+.hero{
+  position:relative;overflow:hidden;
+  border-radius:18px;border:1px solid #2c1c10;
+  background:linear-gradient(115deg,#160e08 0%,#1a1008 40%,#241206 100%);
+  padding:34px 40px 38px;min-height:180px;
+}
+.hero::after{
+  content:"";position:absolute;right:-60px;top:-120px;width:620px;height:420px;
+  background:radial-gradient(closest-side,rgba(255,106,26,.42),rgba(255,106,26,.05),transparent 75%);
+  pointer-events:none;
+}
+.hero .eyebrow{
+  display:flex;align-items:center;gap:9px;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.26em;color:var(--orange-2);
+  position:relative;z-index:2;
+}
+.hero .eyebrow .blip{width:5px;height:5px;border-radius:50%;background:var(--orange);box-shadow:0 0 8px var(--orange);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.hero h2{
+  font-family:var(--serif);font-weight:400;font-size:46px;line-height:1.06;
+  color:var(--cream);margin-top:20px;position:relative;z-index:2;max-width:60%;
+}
+.hero h2 em{color:var(--orange);font-style:italic;display:block}
+.hero .gateway{
+  position:absolute;top:30px;right:32px;z-index:3;
+  display:flex;align-items:center;gap:8px;
+  border:1px solid rgba(255,106,26,.5);border-radius:999px;
+  padding:6px 14px;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;color:var(--orange-2);
+  background:rgba(255,106,26,.06);
+}
+.hero .gateway .d{width:5px;height:5px;border-radius:50%;background:var(--orange);box-shadow:0 0 8px var(--orange)}
+.hero .odometer{position:absolute;bottom:32px;right:40px;text-align:right;z-index:3}
+.hero .odometer .lbl{font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;color:var(--muted-2);margin-bottom:8px}
+.hero .odometer .vals{font-family:var(--mono);font-size:34px;font-weight:500;color:var(--cream);letter-spacing:.1em;display:flex;gap:22px;justify-content:flex-end}
+.hero .odometer .vals span{opacity:.92}
+
+/* ───────── Stats card ───────── */
+.stats{
+  margin-top:18px;border-radius:18px;border:1px solid #241709;
+  background:linear-gradient(180deg,#150e08,#120b07);
+  padding:8px;position:relative;overflow:hidden;
+}
+.stats::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:radial-gradient(rgba(255,255,255,.02) 1px,transparent 1px);
+  background-size:20px 20px;
+}
+.stat-row{display:grid;grid-template-columns:1fr 300px 1fr;gap:8px;position:relative;z-index:1}
+.stat-panel{
+  border:1px solid #2a1a0d;border-radius:14px;
+  background:radial-gradient(120% 130% at 50% 0%,rgba(255,106,26,.06),transparent 70%),#150d07;
+  padding:26px 28px;min-height:150px;position:relative;overflow:hidden;
+}
+.stat-panel .plabel{font-family:var(--mono);font-size:9px;letter-spacing:.22em;color:var(--muted);margin-bottom:6px}
+.stat-panel .big{font-family:var(--mono);font-size:40px;font-weight:500;color:var(--cream)}
+.stat-panel .big .u{font-size:22px;color:var(--muted);margin-left:2px}
+.spark{position:absolute;left:24px;right:24px;bottom:24px;height:44px}
+.spark svg{width:100%;height:100%;overflow:visible}
+.stat-panel.right{text-align:right}
+.stat-panel.right .spark{left:24px}
+
+.ring-panel{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border:1px solid #2a1a0d;border-radius:14px;
+  background:#130c07;padding:22px;position:relative;
+}
+.ring-wrap{position:relative;width:170px;height:170px;display:grid;place-items:center}
+.ring-wrap svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.ring-inner{text-align:center;z-index:1}
+.ring-inner .cap{font-family:var(--mono);font-size:8.5px;letter-spacing:.22em;color:var(--muted)}
+.ring-inner .num{font-family:var(--mono);font-size:44px;font-weight:500;color:var(--cream);line-height:1;margin:8px 0 6px}
+.ring-inner .sub{font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;color:var(--muted-2)}
+.status-chip{
+  margin-top:16px;display:flex;align-items:center;gap:8px;
+  background:#1e140c;border:1px solid #34210f;border-radius:999px;
+  padding:7px 16px;font-size:11px;color:var(--ink);
+}
+.status-chip .d{width:6px;height:6px;border-radius:50%;background:var(--orange);box-shadow:0 0 8px var(--orange)}
+
+.meters{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:26px;
+  padding:20px 26px 6px;position:relative;z-index:1;
+}
+.meter .mtop{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
+.meter .mname{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--muted)}
+.meter .mval{font-family:var(--mono);font-size:11px;color:var(--cream)}
+.meter .mval.ok{color:var(--orange);display:flex;align-items:center;gap:6px}
+.meter .mval.ok .d{width:5px;height:5px;border-radius:50%;background:var(--orange);box-shadow:0 0 6px var(--orange)}
+.meter .track{height:3px;border-radius:3px;background:#241608;overflow:hidden}
+.meter .fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--orange-dim),var(--orange));box-shadow:0 0 8px rgba(255,106,26,.5)}
+
+.section-head{display:flex;align-items:center;gap:14px;margin:30px 2px 16px}
+.section-head .t{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;color:var(--orange-2)}
+.section-head .rule{flex:1;height:1px;background:linear-gradient(90deg,var(--line-2),transparent)}
+
+/* ───────── Workspaces ───────── */
+.ws-frame{
+  border:2px solid var(--orange);border-radius:22px;padding:14px;position:relative;
+  background:linear-gradient(180deg,rgba(255,106,26,.03),transparent);
+}
+.ws-tag{
+  position:absolute;top:-15px;left:26px;background:var(--orange);color:#180d05;
+  font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.16em;
+  padding:6px 16px;border-radius:999px;
+}
+.ws-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:12px}
+.ws-card{
+  border-radius:16px;padding:22px 16px;background:#181008;border:1px solid #2a1c10;
+  min-height:330px;display:flex;flex-direction:column;min-width:0;overflow:hidden;
+}
+.ws-card.hero-card{background:linear-gradient(160deg,#ff6a1a,#f4560f);border-color:#ff7a35}
+.ws-card h3{font-family:var(--serif);font-size:32px;font-weight:400;color:var(--cream)}
+.ws-card.hero-card h3{color:#fff}
+.ws-card .iso{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;color:var(--muted);margin-top:6px}
+.ws-card.hero-card .iso{color:rgba(255,255,255,.8)}
+.ws-card .iso .bx{width:12px;height:12px;border:1px solid currentColor;border-radius:3px;display:grid;place-items:center;font-size:8px}
+.ws-avatars{display:flex;gap:9px;margin:26px 0 auto;min-width:0}
+.ws-av{
+  width:clamp(44px,4.6vw,62px);aspect-ratio:1;flex:0 1 auto;border-radius:50%;position:relative;
+  background:radial-gradient(circle at 40% 28%,#4a3626,#140c06 75%);
+  border:2.5px solid var(--ring,var(--orange));
+}
+.ws-av::after{
+  content:"";position:absolute;bottom:-3px;right:-3px;width:38%;aspect-ratio:1;border-radius:50%;
+  background:var(--badge,#2a1c10);border:2px solid var(--bg-181008,#181008);
+  display:grid;place-items:center;
+}
+.ws-av .g{position:absolute;inset:0;border-radius:50%;display:grid;place-items:center;font-size:clamp(11px,1.2vw,15px);filter:saturate(1.1)}
+.ws-rows{display:flex;flex-direction:column;gap:10px;margin-top:20px}
+.ws-row{
+  background:#241811;border-radius:10px;padding:13px 14px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--muted);
+  display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden;
+}
+.ws-card.hero-card .ws-row{background:rgba(255,255,255,.16);color:#fff}
+.ws-row .ck{color:var(--orange);font-size:12px}
+.ws-card.hero-card .ws-row .ck{color:#fff}
+
+/* ───────── Agent City ───────── */
+.city{display:grid;grid-template-columns:320px 1fr;gap:0;height:calc(100vh - 89px);margin:-22px -26px -40px}
+.crew-list{border-right:1px solid var(--line);background:#0b0806;display:flex;flex-direction:column;min-height:0}
+.crew-search{padding:16px}
+.crew-search .box{display:flex;align-items:center;gap:9px;background:#150e08;border:1px solid var(--line);border-radius:10px;padding:9px 13px;color:var(--muted);font-size:12px}
+.crew-scroll{flex:1;overflow-y:auto;padding:0 10px 16px}
+.crew-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.22em;color:var(--muted-2);padding:6px 12px 10px}
+.crew-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:11px;cursor:pointer;position:relative}
+.crew-item:hover{background:#150e08}
+.crew-item.active{background:#1a1109}
+.crew-item .av{width:40px;height:40px;border-radius:50%;flex-shrink:0;position:relative;background:radial-gradient(circle at 38% 30%,#45331f,#120b06 78%);border:2px solid var(--ring,var(--orange))}
+.crew-item .body{flex:1;min-width:0}
+.crew-item .body .r1{display:flex;justify-content:space-between;align-items:baseline}
+.crew-item .body b{font-size:13.5px;font-weight:600;color:var(--ink)}
+.crew-item .body .tm{font-family:var(--mono);font-size:9px;color:var(--muted-2)}
+.crew-item .body p{font-size:11.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crew-item .badge{background:var(--orange);color:#180d05;font-size:10px;font-weight:700;min-width:19px;height:19px;border-radius:999px;display:grid;place-items:center;padding:0 5px}
+.crew-item .badge.silent{background:#241811;color:var(--muted);font-family:var(--mono);font-size:8px;font-weight:500}
+
+.city-main{overflow-y:auto;padding:26px 30px}
+.city-head{font-family:var(--mono);font-size:11.5px;letter-spacing:.24em;color:var(--orange-2);margin-bottom:20px}
+.agent-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+.agent-card{
+  border-radius:14px;overflow:hidden;position:relative;cursor:pointer;
+  border:1px solid #241811;background:#150e08;
+  aspect-ratio:3/3.4;
+}
+.agent-card .portrait{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 8%,rgba(255,140,60,.18),transparent 55%),linear-gradient(180deg,#241811,#0f0906)}
+.agent-card .silh{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:74%;height:78%}
+.agent-card .name{
+  position:absolute;left:0;right:0;bottom:0;padding:11px 12px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;color:var(--ink);text-align:center;
+  background:linear-gradient(180deg,transparent,rgba(8,5,3,.9) 55%);
+}
+.agent-card.sel{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange),0 0 26px rgba(255,106,26,.28)}
+.agent-card.dim{opacity:.45}
+
+/* silhouette (suit + head) built from layered radial/linear gradients */
+.silh .head{
+  position:absolute;left:50%;top:6%;transform:translateX(-50%);
+  width:44%;padding-bottom:44%;border-radius:50% 50% 46% 46%;
+  background:radial-gradient(circle at 42% 30%,#2c2018,#0a0705 72%);
+  box-shadow:inset 0 6px 14px rgba(255,150,70,.12);
+}
+.silh .neck{position:absolute;left:50%;top:44%;transform:translateX(-50%);width:16%;height:12%;background:#0d0906}
+.silh .suit{
+  position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+  width:96%;height:46%;border-radius:44% 44% 0 0;
+  background:linear-gradient(180deg,#241a12,#0c0805);
+  box-shadow:inset 0 8px 18px rgba(255,150,70,.07);
+}
+.silh .lapel{position:absolute;left:50%;top:0;transform:translateX(-50%);width:0;height:0;border-left:16px solid transparent;border-right:16px solid transparent;border-top:30px solid #0a0705}
+.silh .tie{position:absolute;left:50%;top:6%;transform:translateX(-50%);width:5px;height:34%;background:linear-gradient(180deg,var(--orange-dim),#3a1f0c);border-radius:2px}
+
+.placeholder-view{display:grid;place-items:center;height:70vh;text-align:center}
+.placeholder-view .pv{max-width:440px}
+.placeholder-view h2{font-family:var(--serif);font-size:40px;color:var(--cream);font-weight:400}
+.placeholder-view p{color:var(--muted);margin-top:12px;font-size:14px;line-height:1.6}
+.placeholder-view .eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.26em;color:var(--orange-2);margin-bottom:14px}
+
+/* ───────── Hermes console (embedded) ───────── */
+.console-wrap{display:flex;flex-direction:column;height:calc(100vh - 89px);margin:-22px -26px -40px}
+.console-bar{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);background:#0b0806;flex:0 0 auto}
+.console-bar .ct{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;color:var(--orange-2)}
+.console-bar .sep{flex:1}
+.profile-picks{display:flex;gap:7px;flex-wrap:wrap}
+.profile-pick{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--muted);border:1px solid var(--line-2);background:#150e08;padding:6px 12px;border-radius:999px;cursor:pointer}
+.profile-pick:hover{color:var(--ink);border-color:var(--orange-dim)}
+.profile-pick.on{color:#180d05;background:var(--orange);border-color:var(--orange);font-weight:700}
+.console-open{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ink);text-decoration:none;border:1px solid var(--line-2);background:#150e08;padding:6px 13px;border-radius:999px}
+.console-open:hover{border-color:var(--orange);color:var(--orange)}
+.console-frame{flex:1;border:0;width:100%;background:#0a0705}
+.console-loading{display:grid;place-items:center;flex:1;font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--muted)}
+.agent-card{cursor:pointer}
+.agent-card .open-h{position:absolute;top:8px;right:8px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--muted);background:rgba(10,7,5,.72);border:1px solid var(--line-2);border-radius:6px;padding:3px 7px;opacity:0;transition:opacity .12s}
+.agent-card:hover .open-h{opacity:1;color:var(--orange);border-color:var(--orange)}
+.crew-item .av .gp{position:absolute;right:-3px;bottom:-3px;width:15px;height:15px;border-radius:50%;background:var(--green);border:2px solid #0b0806;display:grid;place-items:center;font-size:8px;color:#04240f;font-weight:700}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ═══ Sidebar ═══ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">N</div>
+      <div class="txt"><b>NEXORA</b><span>OPERATOR SYSTEM</span></div>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="nav-item active" data-view="cockpit"><span class="ic">◉</span>COCKPIT<span class="dot"></span></div>
+      <div class="nav-item" data-view="voice"><span class="ic">🎙</span>VOICE MODE</div>
+      <div class="nav-item" data-view="hand"><span class="ic">✋</span>HAND MODE</div>
+      <div class="nav-item" data-view="chat"><span class="ic">✻</span>CHAT</div>
+      <div class="nav-item" data-view="missions"><span class="ic">◎</span>MISSIONS</div>
+      <div class="nav-item" data-view="docs"><span class="ic">▤</span>DOCS</div>
+      <div class="nav-item" data-view="schedule"><span class="ic">▦</span>SCHEDULE</div>
+      <div class="nav-item" data-view="city"><span class="ic">◈</span>AGENT CITY</div>
+      <div class="nav-item" data-view="health"><span class="ic">♡</span>HEALTH</div>
+      <div class="nav-group-label">MANAGE</div>
+      <div class="nav-item" data-view="console"><span class="ic">▣</span>HERMES<span class="dot"></span></div>
+      <div class="nav-item" data-view="files"><span class="ic">▣</span>FILES</div>
+      <div class="nav-item" data-view="terminal"><span class="ic">❯</span>TERMINAL</div>
+      <div class="nav-item" data-view="integrations"><span class="ic">⚙</span>INTEGRATIONS</div>
+      <div class="nav-item" data-view="guide"><span class="ic">?</span>GUIDE</div>
+      <div class="nav-item" data-view="settings"><span class="ic">◍</span>SETTINGS</div>
+    </nav>
+    <div class="sidebar-foot"><span>v0.21.6</span><span>NOUS RESEARCH</span></div>
+  </aside>
+
+  <!-- ═══ Main ═══ -->
+  <div class="main">
+    <header class="topbar">
+      <div class="greet">
+        <h1>Good morning, Larry</h1>
+        <p>Your agentic operator system is running smoothly.</p>
+      </div>
+      <div class="spacer"></div>
+      <div class="search"><span>⌕</span>Search agents, missions, logs...<span class="kbd">⌘K</span></div>
+      <div class="pill-btn">👋 Hand cursor</div>
+      <div class="pill-btn">⛶ Full screen</div>
+      <div class="clock"><div class="clock-city">BERLIN</div><div class="time" id="clock">--:--:--</div></div>
+      <div class="user-chip"><div class="av"></div><div class="meta"><b>Larry</b><span>OPERATOR</span></div></div>
+    </header>
+
+    <div class="viewport" id="viewport">
+      <!-- ─── COCKPIT ─── -->
+      <section class="view active" id="view-cockpit">
+        <div class="hero">
+          <div class="eyebrow"><span class="blip"></span>IGNITION ON · ORCHESTRATION LAYER ENGAGED</div>
+          <div class="gateway"><span class="d"></span>GATEWAY UP</div>
+          <h2>You are behind the wheel of<em id="hero-line">a five-agent engine.</em></h2>
+          <div class="odometer">
+            <div class="lbl">ODOMETER · LIFETIME RUNS</div>
+            <div class="vals"><span id="odo-a">00</span><span id="odo-b">000</span></div>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat-row">
+            <div class="stat-panel">
+              <div class="plabel">SUCCESS RATE</div>
+              <div class="big" id="success-rate">—</div>
+              <div class="spark">
+                <svg viewBox="0 0 300 44" preserveAspectRatio="none">
+                  <polyline id="spark-1" fill="none" stroke="#ff6a1a" stroke-width="1.6" stroke-linejoin="round" points=""/>
+                </svg>
+              </div>
+            </div>
+            <div class="ring-panel">
+              <div class="ring-wrap">
+                <svg viewBox="0 0 170 170">
+                  <circle cx="85" cy="85" r="72" fill="none" stroke="#2a1a0d" stroke-width="1.5"/>
+                  <circle cx="85" cy="85" r="72" fill="none" stroke="#ff6a1a" stroke-width="2"
+                          stroke-dasharray="1 7" stroke-linecap="round" opacity=".85"/>
+                  <circle cx="85" cy="85" r="60" fill="none" stroke="#3a2413" stroke-width="1" stroke-dasharray="2 5"/>
+                </svg>
+                <div class="ring-inner">
+                  <div class="cap">MISSION CONTROL</div>
+                  <div class="num" id="total-runs">0</div>
+                  <div class="sub">TOTAL RUNS</div>
+                </div>
+              </div>
+              <div class="status-chip"><span class="d"></span>System status: Optimal</div>
+            </div>
+            <div class="stat-panel right">
+              <div class="plabel">AVG. EXECUTION TIME</div>
+              <div class="big"><span id="avg-time">—</span><span class="u">s</span></div>
+              <div class="spark">
+                <svg viewBox="0 0 300 44" preserveAspectRatio="none">
+                  <polyline id="spark-2" fill="none" stroke="#ff6a1a" stroke-width="1.6" stroke-linejoin="round" points=""/>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="meters">
+            <div class="meter"><div class="mtop"><span class="mname">SYSTEM STATUS</span><span class="mval ok"><span class="d"></span>Optimal</span></div><div class="track"><div class="fill" style="width:100%"></div></div></div>
+            <div class="meter"><div class="mtop"><span class="mname">CPU USAGE</span><span class="mval" id="m-cpu">—</span></div><div class="track"><div class="fill" id="f-cpu" style="width:0%"></div></div></div>
+            <div class="meter"><div class="mtop"><span class="mname">RAM USAGE</span><span class="mval" id="m-ram">—</span></div><div class="track"><div class="fill" id="f-ram" style="width:0%"></div></div></div>
+            <div class="meter"><div class="mtop"><span class="mname">DISK USAGE</span><span class="mval" id="m-disk">—</span></div><div class="track"><div class="fill" id="f-disk" style="width:0%"></div></div></div>
+          </div>
+        </div>
+
+        <div class="section-head"><span class="t">ISOLATED WORKSPACES</span><span class="rule"></span></div>
+        <div class="ws-frame">
+          <div class="ws-tag">ONE SERVER · DOCKER</div>
+          <div class="ws-grid" id="ws-grid"></div>
+        </div>
+      </section>
+
+      <!-- ─── AGENT CITY ─── -->
+      <section class="view" id="view-city">
+        <div class="city">
+          <div class="crew-list">
+            <div class="crew-search"><div class="box"><span>⌕</span>Search</div></div>
+            <div class="crew-scroll">
+              <div class="crew-lbl">YOUR CREW</div>
+              <div id="crew-items"></div>
+            </div>
+          </div>
+          <div class="city-main">
+            <div class="city-head" id="city-head">A WHOLE CREW</div>
+            <div class="agent-grid" id="agent-grid"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── HERMES CONSOLE (embedded live dashboard) ─── -->
+      <section class="view" id="view-console">
+        <div class="console-wrap">
+          <div class="console-bar">
+            <span class="ct">HERMES MANAGING UI · LIVE</span>
+            <div class="profile-picks" id="profile-picks"></div>
+            <span class="sep"></span>
+            <a class="console-open" id="console-open" href="http://127.0.0.1:9119/sessions?profile=default" target="_blank" rel="noopener">OPEN IN NEW TAB ↗</a>
+          </div>
+          <div class="console-loading" id="console-loading">LOADING HERMES CONSOLE…</div>
+          <iframe class="console-frame" id="console-frame" style="display:none" title="Hermes managing UI"></iframe>
+        </div>
+      </section>
+
+      <!-- ─── Placeholder views ─── -->
+      <section class="view" id="view-placeholder">
+        <div class="placeholder-view"><div class="pv">
+          <div class="eyebrow" id="pv-eyebrow">MODULE</div>
+          <h2 id="pv-title">Coming online</h2>
+          <p id="pv-body">This module is part of the NEXORA operator system and wires into your Hermes profiles.</p>
+        </div></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════ REAL CREW DATA ══════
+   Wired to the five live Hermes profiles on this machine.
+   Each has: name, profile id, accent ring color, last status line, time, unread. */
+const CREW = [
+  {name:"Orchestrator", profile:"default",    ring:"#ff6a1a", msg:"Plan approved. Starting now.",      time:"09:12", unread:0, active:true},
+  {name:"Research",     profile:"research",   ring:"#3aa0ff", msg:"3 sources found.",                  time:"09:10", unread:2},
+  {name:"Writer",       profile:"writer",     ring:"#b06aff", msg:"Draft ready for review",            time:"09:02", unread:0},
+  {name:"Developer",    profile:"developer",  ring:"#2fd08a", msg:"Deployed ✓ tests pass",             time:"08:55", unread:0},
+  {name:"Data",         profile:"data",       ring:"#ff5aa0", msg:"Weekly numbers are in",             time:"08:46", unread:1},
+];
+
+/* Isolated workspaces — map real profiles onto the four-box layout.
+   Content is highlighted as the primary workspace (matches the design). */
+const WORKSPACES = [
+  {name:"Content",  hero:true,  agents:[
+    {g:"▶",ring:"#ff6a1a"},{g:"✎",ring:"#3aa0ff"},{g:"▣",ring:"#ff4d4d"}]},
+  {name:"Work",     hero:false, agents:[
+    {g:"M",ring:"#ff6a1a"},{g:"</>",ring:"#2fd08a"},{g:"▥",ring:"#ff5aa0"}]},
+  {name:"Personal", hero:false, agents:[
+    {g:"✈",ring:"#3aa0ff"},{g:"◎",ring:"#2fd08a"},{g:"▤",ring:"#ffb03a"}]},
+  {name:"Client",   hero:false, agents:[
+    {g:"⌕",ring:"#3aa0ff"},{g:"✎",ring:"#b06aff"},{g:"◔",ring:"#ffb03a"}]},
+];
+
+/* ══════ Render: workspaces ══════ */
+document.getElementById('ws-grid').innerHTML = WORKSPACES.map(ws=>`
+  <div class="ws-card ${ws.hero?'hero-card':''}">
+    <h3>${ws.name}</h3>
+    <div class="iso"><span class="bx">▤</span>ISOLATED WORKSPACE</div>
+    <div class="ws-avatars">
+      ${ws.agents.map(a=>`<div class="ws-av" style="--ring:${a.ring};--badge:${ws.hero?'rgba(255,255,255,.25)':'#241811'}"><span class="g">${a.g}</span></div>`).join('')}
+    </div>
+    <div class="ws-rows">
+      <div class="ws-row"><span class="ck">✓</span>OWN AGENTS</div>
+      <div class="ws-row"><span class="ck">✓</span>OWN MEMORY</div>
+      <div class="ws-row"><span class="ck">✓</span>OWN TELEGRAM BOT</div>
+    </div>
+  </div>`).join('');
+
+/* ══════ Render: crew list ══════ */
+function renderCrew(){
+document.getElementById('crew-items').innerHTML = CREW.map((c,i)=>`
+  <div class="crew-item ${c.active?'active':''}" data-i="${i}" data-p="${c.profile}" title="Open ${c.name} in Hermes">
+    <div class="av" style="--ring:${c.ring}"><span class="gp">●</span></div>
+    <div class="body">
+      <div class="r1"><b>${c.name}</b><span class="tm">${c.time}</span></div>
+      <p>${c.msg}</p>
+    </div>
+    ${c.unread?`<div class="badge">${c.unread}</div>`:''}
+  </div>`).join('');
+}
+renderCrew();
+
+/* ══════ Render: agent grid ══════ */
+function silhouette(){return `<div class="silh"><div class="head"></div><div class="neck"></div><div class="suit"></div><div class="lapel"></div><div class="tie"></div></div>`;}
+function renderGrid(){
+document.getElementById('agent-grid').innerHTML = CREW.map(c=>`
+  <div class="agent-card ${c.active?'sel':''}" data-p="${c.profile}" title="Open ${c.name} in Hermes">
+    <div class="portrait"></div>
+    <span class="open-h">HERMES ↗</span>
+    ${silhouette()}
+    <div class="name">${c.name.toUpperCase()}</div>
+  </div>`).join('') + EXTRA_CARDS();
+}
+renderGrid();
+function EXTRA_CARDS(){
+  const more=[["EMAIL","#ffb03a"],["MARKETING","#ff6a1a"],["SEO","#2fd08a"],["SOCIAL","#3aa0ff"],["DESIGN","#b06aff"],["VIDEO","#ff5aa0"],["FINANCE","#2fd08a"],["SALES","#ff6a1a"],["SUPPORT","#7a6653",true]];
+  return more.map(([n,r,dim])=>`<div class="agent-card ${dim?'dim':''}"><div class="portrait"></div>${silhouette()}<div class="name">${n}</div></div>`).join('');
+}
+document.getElementById('city-head').textContent = `A WHOLE CREW · ${CREW.length + 9} AGENTS`;
+
+/* ══════ Cockpit numbers ══════ */
+const N = CREW.length;
+document.getElementById('hero-line').textContent = `a ${N}-agent engine.`;
+document.getElementById('total-runs').textContent = '140';
+document.getElementById('odo-a').textContent = String(N).padStart(2,'0');
+document.getElementById('odo-b').textContent = '140';
+document.getElementById('success-rate').textContent = '98.6%';
+document.getElementById('avg-time').textContent = '5.9';
+
+/* ══════ LIVE HERMES CONNECTION ══════
+   Talks to the Hermes backend's public /api/status endpoint (CORS-open, no auth).
+   Pulls the real profile list, gateway state and disk usage; and drives the
+   embedded managing UI (Console view) + per-agent deep links. */
+const HERMES_BASE = 'http://127.0.0.1:9119';
+const RINGS = {default:'#ff6a1a',research:'#3aa0ff',writer:'#b06aff',developer:'#2fd08a',data:'#ff5aa0'};
+const NICK  = {default:'Orchestrator',research:'Research',writer:'Writer',developer:'Developer',data:'Data'};
+let LIVE_PROFILES = CREW.map(c=>c.profile);
+let currentProfile = 'default';
+
+async function loadHermes(){
+  try{
+    const r = await fetch(HERMES_BASE + '/api/status', {cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const s = await r.json();
+
+    /* real crew list */
+    if(Array.isArray(s.profiles) && s.profiles.length){
+      LIVE_PROFILES = s.profiles;
+      rebuildCrew(s.profiles);
+      const n = s.profiles.length;
+      document.getElementById('hero-line').textContent = `a ${n}-agent engine.`;
+      document.getElementById('odo-a').textContent = String(n).padStart(2,'0');
+    }
+
+    /* gateway state → hero pill + sidebar */
+    const up = !!s.gateway_running;
+    const gw = document.querySelector('.hero .gateway');
+    gw.childNodes[1].nodeValue = up ? 'GATEWAY UP' : 'GATEWAY DOWN';
+    gw.style.borderColor = up ? 'rgba(255,106,26,.5)' : 'rgba(150,120,100,.4)';
+    gw.style.color = up ? 'var(--orange-2)' : 'var(--muted)';
+
+    /* live system status text */
+    const ov = s.overall || 'unknown';
+    const chip = document.querySelector('.status-chip');
+    chip.childNodes[1].nodeValue = 'System status: ' + ov.charAt(0).toUpperCase()+ov.slice(1);
+
+    /* real disk usage from the backend (CPU/RAM aren't exposed → keep illustrative) */
+    if(s.disk && typeof s.disk.used_percent === 'number'){
+      setMeter('f-disk','m-disk', Math.round(s.disk.used_percent));
+    }
+
+    /* active sessions → odometer lifetime slot stays, but surface count */
+    window.__hermesStatus = s;
+  }catch(err){
+    console.warn('Hermes backend unreachable:', err);
+    markOffline();
+  }
+}
+
+function markOffline(){
+  const gw = document.querySelector('.hero .gateway');
+  gw.childNodes[1].nodeValue = 'BACKEND OFFLINE';
+  gw.style.borderColor = 'rgba(150,120,100,.4)'; gw.style.color = 'var(--muted)';
+  const chip = document.querySelector('.status-chip');
+  chip.childNodes[1].nodeValue = 'System status: Hermes offline';
+}
+
+/* rebuild crew + grid from the real profile list returned by the backend */
+function rebuildCrew(profiles){
+  const prev = CREW.slice();
+  CREW.length = 0;
+  profiles.forEach((p,i)=>{
+    const old = prev.find(x=>x.profile===p);
+    CREW.push({
+      name: NICK[p] || p.charAt(0).toUpperCase()+p.slice(1),
+      profile: p,
+      ring: RINGS[p] || '#ff6a1a',
+      msg: old ? old.msg : 'Ready.',
+      time: old ? old.time : '--:--',
+      unread: old ? old.unread : 0,
+      active: i===0
+    });
+  });
+  renderCrew(); renderGrid(); buildProfilePicks();
+  document.getElementById('city-head').textContent = `A WHOLE CREW · ${CREW.length + 9} AGENTS`;
+}
+
+/* ══════ Hermes Console: embedded managing UI ══════ */
+function consoleUrl(profile){ return `${HERMES_BASE}/sessions?profile=${encodeURIComponent(profile)}`; }
+function buildProfilePicks(){
+  const el = document.getElementById('profile-picks');
+  el.innerHTML = LIVE_PROFILES.map(p=>`<button class="profile-pick ${p===currentProfile?'on':''}" data-p="${p}">${(NICK[p]||p).toUpperCase()}</button>`).join('');
+}
+function loadConsole(profile){
+  currentProfile = profile;
+  const f = document.getElementById('console-frame');
+  const l = document.getElementById('console-loading');
+  document.getElementById('console-open').href = consoleUrl(profile);
+  f.style.display='none'; l.style.display='grid'; l.textContent = `LOADING ${profile.toUpperCase()}…`;
+  f.onload = ()=>{ l.style.display='none'; f.style.display='block'; };
+  f.src = consoleUrl(profile);
+  document.querySelectorAll('.profile-pick').forEach(b=>b.classList.toggle('on', b.dataset.p===profile));
+}
+document.getElementById('profile-picks').addEventListener('click',e=>{
+  const b=e.target.closest('.profile-pick'); if(b) loadConsole(b.dataset.p);
+});
+
+/* deep link: open a profile's managing page in the Hermes dashboard */
+function openInHermes(profile){ window.open(consoleUrl(profile), '_blank', 'noopener'); }
+
+loadHermes(); setInterval(loadHermes, 15000);   /* refresh live state every 15s */
+
+/* sparklines */
+function spark(id,seed){
+  const pts=[];let v=22+ (seed%7);
+  for(let i=0;i<=30;i++){v+=(Math.sin(i*0.9+seed)*4)+(Math.random()*6-3);v=Math.max(6,Math.min(38,v));pts.push(`${i*10},${44-v}`);}
+  document.getElementById(id).setAttribute('points',pts.join(' '));
+}
+spark('spark-1',1); spark('spark-2',4);
+
+/* meters */
+function setMeter(fillId,valId,pct){document.getElementById(fillId).style.width=pct+'%';document.getElementById(valId).textContent=pct+'%';}
+setMeter('f-cpu','m-cpu',34); setMeter('f-ram','m-ram',41); setMeter('f-disk','m-disk',67);
+
+/* ══════ Live Berlin clock ══════ */
+function tick(){
+  const t=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
+  document.getElementById('clock').textContent=t;
+}
+tick(); setInterval(tick,1000);
+
+/* ══════ Navigation ══════ */
+const PLACEHOLDER={
+  voice:["VOICE MODE","Voice interface","Talk to your crew hands-free. Wire a microphone input to reach any agent by voice."],
+  hand:["HAND MODE","Direct manipulation","Take the wheel yourself — drive the cursor and let agents observe your hand movements."],
+  chat:["CHAT","Open a channel","Pick any agent from Agent City and start a live session with its own memory."],
+  missions:["MISSIONS","Mission log","Every run your crew has executed, with inputs, outputs and exit status."],
+  docs:["DOCS","Knowledge base","Documents and references your agents can retrieve from."],
+  schedule:["SCHEDULE","Cron jobs","Recurring jobs that run on their own. Replies that are exactly [SILENT] stay quiet."],
+  health:["HEALTH","System health","Live CPU, RAM, disk and gateway telemetry across all profiles."],
+  files:["FILES","File manager","Browse each profile's isolated workspace on disk."],
+  terminal:["TERMINAL","Shell","Drop into a shell scoped to any agent's workspace."],
+  integrations:["INTEGRATIONS","Connected services","Telegram, Discord, and the Nous Tool Gateway."],
+  guide:["GUIDE","Operator guide","How to run a multi-agent engine without babysitting it."],
+  settings:["SETTINGS","System settings","Model, provider, tools and telemetry preferences."],
+};
+const views={cockpit:'view-cockpit',city:'view-city',console:'view-console'};
+document.getElementById('nav').addEventListener('click',e=>{
+  const item=e.target.closest('.nav-item'); if(!item)return;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  item.classList.add('active');
+  const v=item.dataset.view;
+  document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));
+  if(views[v]){
+    document.getElementById(views[v]).classList.add('active');
+    if(v==='console') loadConsole(currentProfile);
+  }
+  else{
+    const p=PLACEHOLDER[v]||["MODULE","Coming online","Part of the NEXORA operator system."];
+    document.getElementById('pv-eyebrow').textContent=p[0];
+    document.getElementById('pv-title').textContent=p[1];
+    document.getElementById('pv-body').textContent=p[2];
+    document.getElementById('view-placeholder').classList.add('active');
+  }
+});
+
+/* crew selection → also deep-links into the Hermes managing UI */
+document.getElementById('crew-items').addEventListener('click',e=>{
+  const it=e.target.closest('.crew-item'); if(!it)return;
+  document.querySelectorAll('.crew-item').forEach(n=>n.classList.remove('active'));
+  it.classList.add('active');
+  const idx=+it.dataset.i, prof=it.dataset.p;
+  document.querySelectorAll('.agent-card').forEach((c,i)=>c.classList.toggle('sel',i===idx));
+  if(prof){ currentProfile=prof; openInHermes(prof); }
+});
+
+/* agent grid → deep-link into Hermes */
+document.getElementById('agent-grid').addEventListener('click',e=>{
+  const card=e.target.closest('.agent-card'); if(!card)return;
+  const prof=card.dataset.p;
+  document.querySelectorAll('.agent-card').forEach(c=>c.classList.remove('sel'));
+  card.classList.add('sel');
+  if(prof){ currentProfile=prof; openInHermes(prof); }
+});
+</script>
+</body>
+</html>

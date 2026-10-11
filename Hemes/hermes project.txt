@@ -1,0 +1,110 @@
+https://www.youtube.com/watch?v=h9SsHkRSHxo
+https://komputermechanic.com/tutorials/hermes-agent-tips
+
+Create one new persistent agent as its own Hermes profile, not a temporary sub-agent:
+a permanent agent with a stable identity, its own memory and its own workspace.
+
+Name: [NAME, e.g. Research]
+Profile: [profile name, lowercase, e.g. research]
+Description: [what it does, how it works, and what it must NOT do, e.g. "Finds things
+out with live sources, gives a short brief with a link behind every claim, never
+invents a fact. Does not write my posts and does not write code."]
+
+1. Create the profile with: hermes profile create <profile> --clone
+2. Copy auth.json from your own profile into the new one if it is missing, or it cannot
+   answer at all.
+3. Write its identity into ~/.hermes/profiles/<profile>/SOUL.md, starting with
+   "Your name is <Name>." and then the description above, written as its personality.
+4. Do not create a profile for yourself. You stay the main agent.
+
+Then ask it "Who are you?" and show me its reply.
+
+PROMPT 2
+Create several agents at once
+your main agent
+
+Change the names and descriptions to the agents you want, and add or remove as many as you like.
+
+What to expect: one reply per agent to "Who are you?", each in its own voice.
+
+Show full prompt
+PROMPT 3
+Give every agent its own memory
+your main agent
+
+What to expect: every agent answers "Who are you?" in one line, as itself.
+
+Show full prompt
+Part 02 / 03
+One Telegram topic per agent (Tip 1)
+Out of the box, Hermes answers every message in a Telegram group as your main agent. These five prompts give every agent its own topic and route each topic to the real agent, with its own memory and its own conversation.
+
+PROMPT 4
+Brief your agent and build the channels
+the group's General topic
+
+Before you start:
+
+Create your agents first (prompts 1 to 3).
+In Telegram, create a new group and turn on Topics in the group settings.
+Add your Hermes bot to the group and make it an admin with the Manage topics right.
+Say "hello" in the group's General topic. Your main agent should answer. If it does, you're ready.
+What to expect: one new topic per agent, and a table of their thread ids.
+
+Show full prompt
+PROMPT 5
+Isolate the specialists
+the group's General topic
+
+What to expect: a confirmation that only your main agent is connected to Telegram.
+
+Show full prompt
+PROMPT 6
+Create the routing plugin and switch it on
+the group's General topic
+
+The plugin lives in your own plugins folder, outside Hermes's code, so a Hermes update cannot overwrite it.
+
+What to expect: the plugin enabled, multi-profile mode on, and your agent back after a restart.
+
+Show full prompt
+PROMPT 7
+Start each topic fresh
+each agent's topic
+
+Type this in every agent's topic, so each one starts a new session under its own agent:
+
+Show full prompt
+PROMPT 8
+Test every channel
+each topic, including General
+
+What to expect: every topic answers with its own agent's name.
+
+Show full prompt
+PROMPT 8b
+If a topic answers as your main agent
+the group's General topic
+
+If a topic answers as your main agent, paste this into General:
+
+Show full prompt
+Part 03 / 03
+The stay-quiet prompts (Tip 4)
+Scheduled jobs (Hermes calls them cron jobs) run on their own: check my inbox every hour, scan these sites every morning, watch this server. Most runs find nothing new, but each one still sends you a message to say so. Hermes has a built-in way to skip those: when a scheduled job's reply is exactly [SILENT], Hermes does not send it at all.
+
+PROMPT 9
+Make every new scheduled job stay quiet
+your main agent
+
+What to expect: your agent confirms it saved the rule to its memory.
+
+Show full prompt
+PROMPT 10
+Make the jobs you already have stay quiet
+your main agent
+
+What to expect: a list of the jobs it changed, with their last line before and after.
+
+Show full prompt
+All 11 prompts are free by email. Or skip the setup:
