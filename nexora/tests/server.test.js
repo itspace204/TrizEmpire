@@ -53,3 +53,43 @@ test('does not disclose missing filesystem paths', async () => {
     assert.equal(await response.text(), 'Not found');
   });
 });
+
+test('sends a strict same-origin content security policy', async () => {
+  await withServer(async base => {
+    const response = await fetch(`${base}/`);
+    const csp = response.headers.get('content-security-policy');
+    assert.ok(csp, 'CSP header must be present');
+    assert.match(csp, /default-src 'self'/);
+    assert.match(csp, /object-src 'none'/);
+    assert.match(csp, /frame-ancestors 'none'/);
+    // Vendored modules only: the policy must not allow arbitrary CDNs.
+    assert.ok(!csp.includes('cdn.jsdelivr.net'));
+  });
+});
+
+test('serves vendored same-origin modules', async () => {
+  await withServer(async base => {
+    const response = await fetch(`${base}/vendor/three.module.min.js`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type'), /javascript/);
+    const controls = await fetch(`${base}/vendor/OrbitControls.js`);
+    assert.equal(controls.status, 200);
+  });
+});
+
+test('unknown API paths return JSON 404, not the UI page', async () => {
+  await withServer(async base => {
+    const response = await fetch(`${base}/api/does-not-exist`);
+    assert.equal(response.status, 404);
+    assert.match(response.headers.get('content-type'), /json/);
+    assert.deepEqual(await response.json(), { error: 'not_found' });
+  });
+});
+
+test('healthz rejects POST with an Allow header', async () => {
+  await withServer(async base => {
+    const response = await fetch(`${base}/healthz`, { method: 'POST' });
+    assert.equal(response.status, 405);
+    assert.equal(response.headers.get('allow'), 'GET, HEAD');
+  });
+});
