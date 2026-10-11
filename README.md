@@ -1,63 +1,84 @@
 # TrizEmpire
 
-**TrizEmpire** is an original project by the repository owner. Reference images were used for visual direction; the implementation, project structure, and code are the owner's work. This repository is being organized for maintainability, safer local operation, and clear contributor setup.
+**TrizEmpire** is an original project by the repository owner. Reference images were used for visual direction; the implementation, project structure, and code are the owner's work.
 
-The currently inspected application is **TrizEmpire**, a static Node.js operator interface designed to run alongside a Hermes managing backend on the same machine.
+TrizEmpire is a Node.js operator interface for a local [Hermes](https://github.com/NousResearch) managing backend: a live cockpit, a crew roster, and a 3D "Agent City" where every agent's building glows with its live status (working / ready / idle / offline). It talks to Hermes **through a server-side proxy**, and ships with real server-side authentication for remote use.
 
-> **Security notice:** TrizEmpire is not an authenticated multi-user web application. Keep it bound to loopback. Do not expose it to the public internet or a shared network until authentication, authorization, and a secured remote backend connection have been designed and tested.
+> **Security notice:** without configured password hashes the server runs in loopback-only local mode with no login. It refuses any non-loopback bind unless `ALLOW_REMOTE_HOST=true` **and** authentication are both configured. See [SECURITY.md](SECURITY.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Repository layout
 
-- `nexora/index.html` — operator interface (the current HTML filename is retained for compatibility).
-- `nexora/server.js` — dependency-free Node.js static file server, defaulting to `127.0.0.1:57004`.
-- `nexora/package.json` — scripts and Node.js engine requirement.
-- `.github/workflows/nexora-checks.yml` — automated syntax, test, and secret-scanning checks.
-- `SECURITY.md` — security boundaries and vulnerability reporting.
+- `nexora/index.html` — operator UI (cockpit, crew, Agent City, console embed, login).
+- `nexora/server.js` — zero-dependency Node.js server: static delivery (allowlisted), auth, Hermes proxy, health endpoints.
+- `nexora/lib/` — `auth.js` (scrypt, sessions, rate limiting, CSRF), `hermes.js` (upstream proxy), `security.js` (headers/CSP).
+- `nexora/vendor/` — vendored Three.js (MIT, pinned; `vendor/THREE-LICENSE.txt`).
+- `nexora/scripts/` — `hash-password.js` (create password hashes), `check-syntax.js` (cross-platform syntax check).
+- `nexora/tests/` — automated test suite (`node:test`, no dependencies).
+- `.github/workflows/nexora-checks.yml` — Gitleaks + syntax + tests on Node 20/22/24.
+- `DEPLOYMENT.md` — production deployment guide.
 
 ## Requirements
 
 - Node.js 20 or later; Node.js 24 LTS is recommended.
-- A Hermes backend running locally on port `9119` for live status and console integration. The UI can load without Hermes, but those features will show the backend as offline.
+- A Hermes backend (default `http://127.0.0.1:9119`) for live status. The UI loads without it and honestly reports the backend as offline/disconnected.
 
 ## Run locally
 
-From the repository root:
+```sh
+cd nexora
+npm start                # http://127.0.0.1:57004
+```
+
+No `npm install` is required — the server uses only Node.js built-ins and serves a vendored Three.js.
+
+### Enable login (required for any remote exposure)
 
 ```sh
 cd nexora
-npm start
+node scripts/hash-password.js        # paste password on stdin; prints scrypt hash
+TRIZ_ADMIN_PASSWORD_HASH='scrypt$…' npm start
 ```
 
-Open [http://127.0.0.1:57004](http://127.0.0.1:57004).
-
-No `npm install` is required for this app's static server because it uses only Node.js built-in modules.
+Sign in as `admin` with the password you hashed. Optionally set `TRIZ_OPERATOR_PASSWORD_HASH` for a second, non-admin account.
 
 ## Checks and tests
 
-From `nexora/`:
-
 ```sh
-npm run check
-npm test
+cd nexora
+npm run check     # syntax check across the project
+npm test          # 29 tests: server, auth, sessions, CSRF, rate limiting,
+                  # proxy states, traversal/symlink protection, headers,
+                  # plus a real-Hermes integration test (skips if Hermes is down)
 ```
-
-These use Node's built-in syntax checker and test runner.
 
 ## Configuration
 
-- `HOST`: defaults to `127.0.0.1`. The server refuses a non-loopback host unless `ALLOW_REMOTE_HOST=true` is explicitly set.
-- `PORT`: defaults to `57004`; must be an integer from 1 through 65535.
+All via environment variables — full table in [DEPLOYMENT.md](DEPLOYMENT.md). Highlights:
 
-**Do not set `ALLOW_REMOTE_HOST=true` on a public or untrusted network.** This switch does not add authentication.
+- `HOST` defaults to `127.0.0.1`; non-loopback binds require `ALLOW_REMOTE_HOST=true` **and** configured auth.
+- `HERMES_BASE_URL` — server-side upstream (fixed `/api/status` path only; never an open proxy).
+- `HERMES_PUBLIC_URL` — console-embed URL for the operator's own machine; set empty on remote deployments (the UI then shows an unavailable panel).
+- `NODE_ENV=production` — `Secure` session cookies.
+
+## Architecture
+
+```
+browser ── same-origin HTTP ──▶ TrizEmpire server ──▶ Hermes /api/status
+   │                               │
+   │ (auth: scrypt + sessions,     │ static UI + vendored Three.js
+   │  CSRF, rate limiting)         └── /api/hermes/status proxy
+   └── embedded console (local-only, HERMES_PUBLIC_URL)
+```
+
+The browser never assumes `127.0.0.1:9119` exists: live data comes from the server-side proxy, and the embedded Hermes console only activates when the server says Hermes is reachable and the embed URL is configured.
 
 ## Secrets and security
 
-- Never commit API keys, passwords, session tokens, private keys, or production database credentials.
-- Keep secrets in ignored environment files or an approved secret manager; commit placeholders only.
-- If a secret was committed, revoke or rotate it. Deleting it from the latest version does not remove it from Git history.
-- The browser UI points to `http://127.0.0.1:9119`. For visitors, that address means their own computer, not the operator's server. Remote deployment needs an authenticated API/proxy rather than a hardcoded localhost address.
-- Dashboard values must only be presented as live telemetry when they are backed by real measurements.
+- Never commit API keys, passwords, session tokens, private keys, or real `.env` files (`.env*` is gitignored; commit `.env.example` placeholders only).
+- Passwords exist only as scrypt hashes in environment variables.
+- If a secret was committed, revoke or rotate it — deleting it from the latest version does not remove it from Git history.
+- Dashboard values are only presented as live telemetry when backed by real measurements; unavailable metrics render as `—`.
 
 ## License
 
-Original TrizEmpire project code is licensed under the MIT License; see [LICENSE](LICENSE). The owner has stated that the implementation is original and reference images were used for visual direction. The MIT license applies to the project's original code, not to third-party fonts, icons, libraries, or assets that may carry their own terms. Verify and preserve those separate licenses and attributions where applicable.
+Original TrizEmpire project code is licensed under the MIT License; see [LICENSE](LICENSE). The vendored Three.js library is MIT-licensed separately (`nexora/vendor/THREE-LICENSE.txt`). Web fonts (Google Fonts) and any third-party assets carry their own terms — verify and preserve those separately.
