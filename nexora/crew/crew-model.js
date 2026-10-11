@@ -1,0 +1,177 @@
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════════════
+ * CREW MODEL — pure, DOM-free logic shared by the Crew command center.
+ *
+ * Loaded two ways:
+ *   - in the browser as a classic script (window.NEXORA_MODEL)
+ *   - in node tests via require() — the exact same code the UI runs.
+ *
+ * Contents:
+ *   - OUTFITS      : the mannequin visual identity (one formal outfit per
+ *                    agent, assigned deterministically from the stable id).
+ *   - STATUS       : honest lifecycle states derived from the Hermes backend.
+ *   - deriveStatuses(): backend status → per-agent states (never fabricated).
+ *   - otherAgents()   : the DERIVED right-hand roster (selected agent excluded)
+ *                    — computed with filter(), never by moving agents between
+ *                    arrays, so nothing is ever duplicated or lost.
+ *   - mannequinSVG()  : consistent faceless mannequin portrait, same identity
+ *                    everywhere it appears (sidebar, roster, fallback stage).
+ * ══════════════════════════════════════════════════════════════════════ */
+
+/* ── mannequin visual identity ─────────────────────────────────────── */
+
+/* Faceless premium mannequins: glossy black metallic head, formal outfit.
+ * Variety follows the reference: black suits + tie, tuxedos + bow tie,
+ * ivory jackets, charcoal, bronze-trimmed, midnight. No faces, ever. */
+const OUTFITS = [
+  { id: 'noir-tie',   jacket: '#171310', shade: '#0d0b09', shirt: '#e9e2d4', accent: '#d5b38a', tie: { kind: 'long', color: '#211c17' } },
+  { id: 'tux-bow',    jacket: '#121010', shade: '#0a0909', shirt: '#f3ede1', accent: '#e3c795', tie: { kind: 'bow',  color: '#100e0d' } },
+  { id: 'ivory',      jacket: '#e6dcc6', shade: '#c9bd9f', shirt: '#191512', accent: '#a98c58', tie: { kind: 'long', color: '#171310' } },
+  { id: 'charcoal',   jacket: '#221e1a', shade: '#16130f', shirt: '#ded4c2', accent: '#d5b38a', tie: { kind: 'long', color: '#5c4a32' } },
+  { id: 'bronze',     jacket: '#2b2018', shade: '#191209', shirt: '#e8ddc8', accent: '#caa066', tie: { kind: 'bow',  color: '#caa066' } },
+  { id: 'midnight',   jacket: '#151823', shade: '#0d0f16', shirt: '#e7e2d8', accent: '#d5b38a', tie: { kind: 'long', color: '#1c2030' } },
+];
+
+/* Short presentational role labels for known profiles; any other profile
+ * (the live Hermes list can grow) falls back to its own name. These label
+ * the agent's domain only — they do not imply any backend capability. */
+const ROLE = {
+  default: 'COMMAND',
+  research: 'RESEARCH',
+  writer: 'WRITING',
+  developer: 'ENGINEERING',
+  data: 'ANALYTICS',
+};
+
+/* Stable hash (FNV-1a style) → the same agent always gets the same
+ * mannequin outfit, everywhere it appears. */
+function hashId(str) {
+  let h = 2166136261 >>> 0;
+  const s = String(str || 'default');
+  for (let i = 0; i < s.length; i += 1) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h;
+}
+
+function outfitFor(profileId) {
+  return OUTFITS[hashId(profileId) % OUTFITS.length];
+}
+
+function roleFor(profileId) {
+  return ROLE[profileId] || String(profileId || 'agent').toUpperCase();
+}
+
+/* ── honest status vocabulary ──────────────────────────────────────── */
+
+/* States the Hermes backend can actually evidence:
+ *   working — counted among the active agents
+ *   ready   — gateway up, nothing running
+ *   idle    — gateway up, others are working
+ *   offline — gateway down / backend unreachable
+ * "Thinking"/"Completed" are deliberately absent: the backend cannot
+ * evidence them, and this project never fabricates state. */
+const STATUS = {
+  working: { css: '#ff4d4d', text: 'WORKING' },
+  ready:   { css: '#3ddc84', text: 'READY' },
+  idle:    { css: '#4aa8ff', text: 'IDLE' },
+  offline: { css: '#a06bff', text: 'OFFLINE' },
+};
+
+function statusInfo(key) {
+  return STATUS[key] || STATUS.offline;
+}
+
+/* Backend status object → { [profile]: statusKey }. Mirrors the Agent City
+ * derivation so both views always agree. */
+function deriveStatuses(status, profiles) {
+  const list = Array.isArray(profiles) ? profiles : [];
+  const map = {};
+  if (!status || status.gateway_running !== true) {
+    list.forEach(p => { map[p] = 'offline'; });
+    return map;
+  }
+  const working = Math.min(Number(status.active_agents) || 0, list.length);
+  list.forEach((p, i) => {
+    map[p] = i < working ? 'working' : (working > 0 ? 'idle' : 'ready');
+  });
+  return map;
+}
+
+/* ── derived roster ────────────────────────────────────────────────── */
+
+/* The right-hand roster is ALWAYS derived from the complete collection:
+ * filter by id, never mutate, never dedupe-by-hand. The previously
+ * selected agent therefore reappears automatically and no agent can be
+ * duplicated or lost, whatever the selection history. */
+function otherAgents(agents, selectedId) {
+  return (Array.isArray(agents) ? agents : [])
+    .filter(a => a && a.id !== selectedId);
+}
+
+/* ── mannequin portrait (SVG data URI) ─────────────────────────────── */
+
+function escAttr(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/* A consistent, faceless mannequin bust: glossy black head, tailored
+ * shoulders, champagne-gold piping. Same identity source as the 3D stage
+ * (both read outfitFor), so thumbnails and the central figure agree. */
+function mannequinSVG(agent, outfit) {
+  const o = outfit || outfitFor(agent && (agent.id || agent.profile));
+  const gold = escAttr(o.accent);
+  const shirt = escAttr(o.shirt);
+  const tieColor = escAttr(o.tie.color);
+  const tieShape = o.tie.kind === 'bow'
+    ? '<path d="M41 68.5 L50 72.5 L50 64.5 Z" fill="' + tieColor + '"/>'
+      + '<path d="M59 68.5 L50 72.5 L50 64.5 Z" fill="' + tieColor + '"/>'
+    : '<path d="M47.4 72 L52.6 72 L54 95 L50 98.5 L46 95 Z" fill="' + tieColor + '"/>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Mannequin portrait">'
+    + '<defs>'
+    + '<radialGradient id="bg" cx="50%" cy="32%" r="82%"><stop offset="0" stop-color="#241a12"/><stop offset="1" stop-color="#0b0908"/></radialGradient>'
+    + '<linearGradient id="jk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + escAttr(o.jacket) + '"/><stop offset="1" stop-color="' + escAttr(o.shade) + '"/></linearGradient>'
+    + '<radialGradient id="hd" cx="35%" cy="25%" r="88%"><stop offset="0" stop-color="#635948"/><stop offset=".38" stop-color="#211d19"/><stop offset="1" stop-color="#0a0908"/></radialGradient>'
+    + '<linearGradient id="gd" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2e0b8"/><stop offset="1" stop-color="' + gold + '"/></linearGradient>'
+    + '</defs>'
+    + '<circle cx="50" cy="50" r="50" fill="url(#bg)"/>'
+    + '<path d="M8 100 C10 77 26 67 50 67 C74 67 90 77 92 100 Z" fill="url(#jk)"/>'
+    + '<path d="M38.5 69.5 C42.5 80 46 86.5 50 92.5" fill="none" stroke="url(#gd)" stroke-width="1.15" opacity=".9"/>'
+    + '<path d="M61.5 69.5 C57.5 80 54 86.5 50 92.5" fill="none" stroke="url(#gd)" stroke-width="1.15" opacity=".9"/>'
+    + '<path d="M39 66.5 L50 73 L61 66.5 L56 63.5 L44 63.5 Z" fill="' + shirt + '"/>'
+    + tieShape
+    + '<rect x="43" y="51" width="14" height="15" rx="6.4" fill="#151210"/>'
+    + '<ellipse cx="50" cy="37.5" rx="15.5" ry="19.5" fill="url(#hd)"/>'
+    + '<path d="M37.5 26.5 C42.5 20.5 57.5 20.5 62.5 26.5" fill="none" stroke="' + gold + '" stroke-width="1.3" opacity=".55"/>'
+    + '</svg>';
+}
+
+function avatarDataURI(agent, outfit) {
+  return 'data:image/svg+xml,' + encodeURIComponent(mannequinSVG(agent, outfit));
+}
+
+/* ── exports ───────────────────────────────────────────────────────── */
+
+const NEXORA_MODEL = {
+  OUTFITS,
+  ROLE,
+  STATUS,
+  hashId,
+  outfitFor,
+  roleFor,
+  statusInfo,
+  deriveStatuses,
+  otherAgents,
+  mannequinSVG,
+  avatarDataURI,
+};
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = NEXORA_MODEL;
+}
+if (typeof window !== 'undefined') {
+  window.NEXORA_MODEL = NEXORA_MODEL;
+}

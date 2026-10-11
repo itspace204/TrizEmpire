@@ -294,24 +294,104 @@ body{
 .ws-card.hero-card .ws-row .ck{color:#fff}
 
 /* ───────── Agent City ───────── */
-/* ───────── Crew roster (own view) ───────── */
-.roster{height:calc(100vh - 89px);margin:-22px -26px -40px;display:flex}
-.crew-list{flex:1;border-right:1px solid var(--line);background:#0b0806;display:flex;flex-direction:column;min-height:0}
-.crew-search{padding:16px}
-.crew-search .box{display:flex;align-items:center;gap:9px;background:#150e08;border:1px solid var(--line);border-radius:10px;padding:9px 13px;color:var(--muted);font-size:12px}
-.crew-scroll{flex:1;overflow-y:auto;padding:0 10px 16px}
-.crew-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.22em;color:var(--muted-2);padding:6px 12px 10px}
-.crew-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:11px;cursor:pointer;position:relative}
+/* ───────── Crew — command center (sidebar · orbital stage · derived roster) ───────── */
+.crew-cx{height:calc(100vh - 89px);margin:-22px -26px -40px;display:grid;grid-template-columns:268px minmax(0,1fr) 306px;position:relative;background:radial-gradient(900px 520px at 50% 16%,rgba(255,106,26,.09),transparent 62%),radial-gradient(700px 420px at 50% 118%,rgba(213,179,138,.05),transparent 60%),var(--bg)}
+.crew-topbar{display:none}
+.crew-side{border-right:1px solid var(--line);background:#0a0705;display:flex;flex-direction:column;min-height:0;min-width:0}
+.crew-search{padding:16px 14px 10px}
+.crew-search .box{display:flex;align-items:center;gap:9px;background:#150e08;border:1px solid var(--line);border-radius:10px;padding:9px 13px;color:var(--muted);transition:border-color .14s}
+.crew-search .box:focus-within{border-color:var(--orange-dim)}
+.crew-search input{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--ink);font:inherit;font-size:12.5px}
+.crew-search input::placeholder{color:var(--muted-2)}
+.crew-scroll{flex:1;overflow-y:auto;padding:0 10px 16px;min-height:0}
+.crew-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.24em;color:var(--muted-2);padding:8px 12px 10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.crew-lbl b{color:var(--orange-2);font-weight:500}
+.crew-item{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:12px;cursor:pointer;position:relative;background:none;border:1px solid transparent;color:inherit;font:inherit;text-align:left;transition:background .14s,border-color .14s,box-shadow .2s}
 .crew-item:hover{background:#150e08}
-.crew-item.active{background:#1a1109}
-.crew-item .av{width:40px;height:40px;border-radius:50%;flex-shrink:0;position:relative;background:radial-gradient(circle at 38% 30%,#45331f,#120b06 78%);border:2px solid var(--ring,var(--orange))}
+.crew-item:focus-visible{outline:2px solid var(--orange);outline-offset:-2px}
+.crew-item.sel{background:#1a1109;border-color:rgba(255,106,26,.55);box-shadow:0 0 0 1px rgba(255,106,26,.16),0 0 26px rgba(255,106,26,.12)}
+.crew-item .av{width:40px;height:40px;border-radius:50%;flex-shrink:0;overflow:hidden;border:1.5px solid var(--st,#3a281a);background:#120b06;transition:box-shadow .2s}
+.crew-item.sel .av{box-shadow:0 0 16px rgba(255,106,26,.4)}
+.crew-item .av img{width:100%;height:100%;display:block;object-fit:cover}
 .crew-item .body{flex:1;min-width:0}
-.crew-item .body .r1{display:flex;justify-content:space-between;align-items:baseline}
-.crew-item .body b{font-size:13.5px;font-weight:600;color:var(--ink)}
-.crew-item .body .tm{font-family:var(--mono);font-size:9px;color:var(--muted-2)}
-.crew-item .body p{font-size:11.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.crew-item .badge{background:var(--orange);color:#180d05;font-size:10px;font-weight:700;min-width:19px;height:19px;border-radius:999px;display:grid;place-items:center;padding:0 5px}
-.crew-item .badge.silent{background:#241811;color:var(--muted);font-family:var(--mono);font-size:8px;font-weight:500}
+.crew-item .body .r1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.crew-item .body b{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crew-item .body .tm{font-family:var(--mono);font-size:9px;color:var(--muted-2);flex-shrink:0}
+.crew-item .body .p{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crew-item .body .p .d{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--st,#a06bff);box-shadow:0 0 7px var(--st,#a06bff)}
+.crew-item .badge{background:var(--orange);color:#180d05;font-size:10px;font-weight:700;min-width:19px;height:19px;border-radius:999px;display:grid;place-items:center;padding:0 5px;flex-shrink:0}
+.crew-empty{padding:30px 16px;text-align:center;color:var(--muted-2);font-family:var(--mono);font-size:10px;letter-spacing:.18em}
+
+/* ───────── Crew — orbital stage ───────── */
+.crew-stage{position:relative;min-width:0;overflow:hidden;background:radial-gradient(58% 46% at 50% 36%,rgba(255,106,26,.10),transparent 72%),#0b0909}
+#crew-canvas{width:100%;height:100%;display:block}
+.crew-stage-badge{position:absolute;top:16px;left:18px;z-index:3;display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;color:var(--orange-2);background:rgba(10,7,5,.66);border:1px solid var(--line-2);border-radius:999px;padding:8px 15px;backdrop-filter:blur(6px)}
+.crew-stage-badge .blip{width:6px;height:6px;border-radius:50%;background:var(--orange);box-shadow:0 0 8px var(--orange);animation:pulse 2s infinite}
+.crew-info{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:3;width:min(432px,calc(100% - 36px));background:rgba(21,14,8,.82);border:1px solid var(--line-2);border-radius:16px;padding:15px 20px 14px;backdrop-filter:blur(10px);box-shadow:0 18px 50px rgba(0,0,0,.45);transition:opacity .18s ease,transform .18s ease}
+.crew-info.out{opacity:0;transform:translateX(-50%) translateY(10px)}
+.ci-name{font-family:var(--serif);font-size:27px;color:var(--cream);line-height:1.05}
+.ci-rows{margin-top:9px;display:flex;flex-direction:column;gap:5px}
+.ci-row{display:flex;align-items:baseline;gap:12px}
+.ci-row .k{font-family:var(--mono);font-size:8.5px;letter-spacing:.22em;color:var(--muted-2);width:88px;flex-shrink:0}
+.ci-row .v{font-size:12px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-status{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;letter-spacing:.18em}
+.ci-status .d{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;flex-shrink:0}
+.ci-actions{margin-top:12px;display:flex;gap:9px}
+.ci-btn{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;padding:8px 15px;border-radius:999px;border:1px solid var(--line-2);background:#150e08;color:var(--ink);cursor:pointer;transition:border-color .14s,color .14s,background .14s}
+.ci-btn:hover{border-color:var(--orange);color:var(--orange)}
+.ci-btn:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.ci-btn.primary{background:var(--orange);border-color:var(--orange);color:#180d05;font-weight:700}
+.ci-btn.primary:hover{background:var(--orange-2);color:#180d05}
+
+/* ───────── Crew — derived roster (all agents except the selected one) ───────── */
+.crew-roster{border-left:1px solid var(--line);background:#0a0705;display:flex;flex-direction:column;min-height:0;min-width:0}
+.crew-roster-scroll{flex:1;overflow-y:auto;padding:0 10px 16px;min-height:0}
+.crew-r-row{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:10px;cursor:pointer;background:none;border:1px solid transparent;color:inherit;font:inherit;text-align:left;transition:background .14s}
+.crew-r-row.anim{animation:crewRowIn .32s ease both}
+.crew-r-row:hover{background:#150e08}
+.crew-r-row:focus-visible{outline:2px solid var(--orange);outline-offset:-2px}
+.crew-r-row .av{width:30px;height:30px;border-radius:50%;overflow:hidden;flex-shrink:0;border:1.5px solid var(--st,#3a281a);background:#120b06}
+.crew-r-row .av img{width:100%;height:100%;display:block;object-fit:cover}
+.crew-r-row .rr{flex:1;min-width:0}
+.crew-r-row .rr b{display:block;font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crew-r-row .rr span{font-family:var(--mono);font-size:8px;letter-spacing:.2em;color:var(--muted-2)}
+.crew-r-row .d{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--st,#a06bff);box-shadow:0 0 7px var(--st,#a06bff)}
+.crew-r-row .badge{background:var(--orange);color:#180d05;font-size:9px;font-weight:700;min-width:17px;height:17px;border-radius:999px;display:grid;place-items:center;padding:0 4px;flex-shrink:0}
+@keyframes crewRowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ───────── Crew — no-WebGL fallback (still genuinely animated) ───────── */
+.crew-fallback{position:absolute;inset:0;display:grid;place-items:center;z-index:1}
+.crew-fallback[hidden]{display:none}
+.fb-stage{position:relative;width:min(300px,58vw);aspect-ratio:1;display:grid;place-items:center}
+.fb-rings span{position:absolute;inset:0;border-radius:50%;border:1px dashed rgba(213,179,138,.45)}
+.fb-rings .r1{border-color:rgba(255,138,61,.6);animation:fbSpin 17s linear infinite}
+.fb-rings .r2{inset:11%;border-color:rgba(213,179,138,.38);animation:fbSpinRev 29s linear infinite}
+@keyframes fbSpin{to{transform:rotate(360deg)}}
+@keyframes fbSpinRev{to{transform:rotate(-360deg)}}
+.fb-img{width:46%;border-radius:50%;position:relative;z-index:2}
+
+/* ───────── Crew — responsive (tablet narrower, mobile drawer + bottom sheet) ───────── */
+@media (max-width:1120px){
+  .crew-cx{grid-template-columns:224px minmax(0,1fr) 250px}
+}
+@media (max-width:880px){
+  .crew-cx{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .crew-topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:#0a0705}
+  .crew-topbar .ct{font-family:var(--mono);font-size:10px;letter-spacing:.24em;color:var(--orange-2)}
+  .crew-toggle{background:#150e08;border:1px solid var(--line-2);color:var(--ink);border-radius:9px;width:38px;height:32px;cursor:pointer;font-size:13px;line-height:1}
+  .crew-toggle:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+  .crew-side{position:absolute;left:0;top:0;bottom:0;width:min(310px,86vw);z-index:20;transform:translateX(-102%);transition:transform .25s ease;border-right:1px solid var(--line-2)}
+  .crew-side.open{transform:none;box-shadow:24px 0 60px rgba(0,0,0,.5)}
+  .crew-roster{position:absolute;left:0;right:0;bottom:0;top:auto;max-height:62%;z-index:20;transform:translateY(102%);transition:transform .25s ease;border-top:1px solid var(--line-2);border-left:0;border-radius:16px 16px 0 0}
+  .crew-roster.open{transform:none;box-shadow:0 -24px 60px rgba(0,0,0,.5)}
+  .crew-scrim{position:absolute;inset:0;background:rgba(5,3,2,.55);z-index:15;border:0;padding:0}
+  .crew-scrim[hidden]{display:none}
+}
+@media (prefers-reduced-motion: reduce){
+  .crew-info,.crew-item,.crew-r-row,.crew-side,.crew-roster{transition:none}
+  .crew-r-row{animation:none}
+  .fb-rings .r1,.fb-rings .r2{animation:none}
+}
 
 /* ───────── Agent City — 3D orbital map ───────── */
 .city3d{position:relative;height:calc(100vh - 89px);margin:-22px -26px -40px;overflow:hidden}
@@ -388,7 +468,7 @@ body{
 .auth-card button{background:var(--orange);color:#180d05;border:0;border-radius:9px;padding:11px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.18em;cursor:pointer}
 .auth-card button:hover{background:var(--orange-2)}
 .auth-err{min-height:16px;font-size:11px;color:#ff6a6a;text-align:center}
-.crew-item .av .gp{position:absolute;right:-3px;bottom:-3px;width:15px;height:15px;border-radius:50%;background:var(--green);border:2px solid #0b0806;display:grid;place-items:center;font-size:8px;color:#04240f;font-weight:700}
+/* crew presence dot removed with the roster redesign — status is shown per agent honestly from the backend */
 </style>
 </head>
 <body>
@@ -511,16 +591,51 @@ body{
         </div>
       </section>
 
-      <!-- ─── CREW (chat roster) ─── -->
+      <!-- ─── CREW — command center ─── -->
       <section class="view" id="view-crew">
-        <div class="roster">
-          <div class="crew-list">
-            <div class="crew-search"><div class="box"><span>⌕</span>Search</div></div>
-            <div class="crew-scroll">
-              <div class="crew-lbl">YOUR CREW · LIVE PROFILES</div>
-              <div id="crew-items"></div>
-            </div>
+        <div class="crew-cx" id="crew-cx">
+          <div class="crew-topbar">
+            <button class="crew-toggle" id="crew-nav-toggle" title="Open crew navigation" aria-label="Open crew navigation">☰</button>
+            <span class="ct">CREW COMMAND</span>
+            <button class="crew-toggle" id="crew-roster-toggle" title="Show the rest of the crew" aria-label="Show the rest of the crew">▤</button>
           </div>
+          <aside class="crew-side" id="crew-side" aria-label="Crew navigation">
+            <div class="crew-search"><div class="box"><span>⌕</span><input id="crew-search-input" type="search" placeholder="Search agents" aria-label="Search agents" autocomplete="off" /></div></div>
+            <div class="crew-scroll">
+              <div class="crew-lbl">YOUR CREW <b id="crew-count">0</b></div>
+              <div id="crew-items" role="listbox" aria-label="Agents"></div>
+            </div>
+          </aside>
+          <main class="crew-stage" id="crew-stage">
+            <canvas id="crew-canvas"></canvas>
+            <div class="crew-fallback" id="crew-fallback" hidden>
+              <div class="fb-stage">
+                <div class="fb-rings"><span class="r1"></span><span class="r2"></span></div>
+                <img class="fb-img" id="fb-img" alt="" />
+              </div>
+            </div>
+            <div class="crew-stage-badge"><span class="blip"></span>ORBITAL STAGE · <span id="crew-stage-status">—</span></div>
+            <div class="crew-info" id="crew-info">
+              <div class="ci-name" id="ci-name">—</div>
+              <div class="ci-rows">
+                <div class="ci-row"><span class="k">ROLE</span><span class="v" id="ci-role">—</span></div>
+                <div class="ci-row"><span class="k">STATUS</span><span class="ci-status" id="ci-status"><span class="d"></span><span>—</span></span></div>
+                <div class="ci-row"><span class="k">LAST SIGNAL</span><span class="v" id="ci-msg">—</span></div>
+                <div class="ci-row"><span class="k">PROFILE</span><span class="v" id="ci-profile">—</span></div>
+              </div>
+              <div class="ci-actions">
+                <button class="ci-btn primary" id="ci-open-hermes" title="Open this agent's session in the Hermes dashboard">OPEN IN HERMES ↗</button>
+                <button class="ci-btn" id="ci-open-map" title="Show this agent on the Agent City map">AGENT CITY</button>
+              </div>
+            </div>
+          </main>
+          <aside class="crew-roster" id="crew-roster" aria-label="Other agents">
+            <div class="crew-lbl">OTHER AGENTS <b id="crew-roster-count">0</b></div>
+            <div class="crew-roster-scroll">
+              <div id="crew-roster-items" role="listbox" aria-label="Other agents"></div>
+            </div>
+          </aside>
+          <button class="crew-scrim" id="crew-scrim" aria-label="Close panels" hidden></button>
         </div>
       </section>
 
@@ -573,6 +688,7 @@ body{
   </div>
 </div>
 
+<script src="/crew/crew-model.js"></script>
 <script>
 /* ══════ REAL CREW DATA ══════
    Wired to the five live Hermes profiles on this machine.
@@ -613,19 +729,195 @@ document.getElementById('ws-grid').innerHTML = WORKSPACES.map(ws=>`
     </div>
   </div>`).join('');
 
-/* ══════ Render: crew list ══════ */
-function renderCrew(){
-document.getElementById('crew-items').innerHTML = CREW.map((c,i)=>`
-  <div class="crew-item ${c.active?'active':''}" data-i="${i}" data-p="${c.profile}" title="Open ${c.name} in Hermes">
-    <div class="av" style="--ring:${c.ring}"><span class="gp">●</span></div>
-    <div class="body">
-      <div class="r1"><b>${c.name}</b><span class="tm">${c.time}</span></div>
-      <p>${c.msg}</p>
-    </div>
-    ${c.unread?`<div class="badge">${c.unread}</div>`:''}
-  </div>`).join('');
+/* ══════ CREW COMMAND CENTER ══════
+   Sidebar (all agents) · orbital stage (selected agent) · right roster
+   (DERIVED: everyone except the selected agent — never hand-moved between
+   arrays, so nothing is ever duplicated or lost). Selection is real app
+   state: it drives currentProfile, which the console embed and Agent City
+   already share. */
+const MODEL = window.NEXORA_MODEL;
+let selectedAgentId = CREW.length ? CREW[0].profile : null;
+let crewStatuses = {};                 // profile -> honest state key
+let crewQuery = '';
+const CREW_MSG = {
+  working: 'Running — counted active by the gateway.',
+  ready:   'Gateway up · standing by.',
+  idle:    'Gateway up · others are working.',
+  offline: 'Gateway unreachable.',
+};
+
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+function prefersReduced(){ return matchMedia('(prefers-reduced-motion: reduce)').matches; }
+function crewNow(){
+  return new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
+}
+const avatarCache = new Map();
+function avatarFor(id){
+  if(!avatarCache.has(id)) avatarCache.set(id, MODEL.avatarDataURI({id}));
+  return avatarCache.get(id);
+}
+function crewAgents(){
+  return CREW.map(c => ({
+    id: c.profile,
+    name: c.name,
+    role: MODEL.roleFor(c.profile),
+    ring: c.ring,
+    msg: c.msg,
+    time: c.time,
+    unread: c.unread | 0,
+    status: crewStatuses[c.profile] || 'offline',
+  }));
+}
+
+function crewRowHTML(a, sel){
+  const st = MODEL.statusInfo(a.status);
+  return `<button type="button" class="crew-item ${sel?'sel':''}" data-p="${esc(a.id)}" style="--st:${st.css}" role="option" aria-selected="${sel}" title="Focus ${esc(a.name)} on the orbital stage">
+    <span class="av"><img alt="" src="${avatarFor(a.id)}"></span>
+    <span class="body">
+      <span class="r1"><b>${esc(a.name)}</b><span class="tm">${esc(a.time)}</span></span>
+      <span class="p"><span class="d"></span>${esc(a.msg)}</span>
+    </span>
+    ${a.unread?`<span class="badge" title="${a.unread} unread">${a.unread}</span>`:''}
+  </button>`;
+}
+function rosterRowHTML(a, i, animate){
+  const st = MODEL.statusInfo(a.status);
+  return `<button type="button" class="crew-r-row ${animate?'anim':''}" data-p="${esc(a.id)}" style="--st:${st.css};animation-delay:${Math.min(i,10)*24}ms" title="Focus ${esc(a.name)}">
+    <span class="av"><img alt="" src="${avatarFor(a.id)}"></span>
+    <span class="rr"><b>${esc(a.name)}</b><span>${esc(a.role)}</span></span>
+    ${a.unread?`<span class="badge" title="${a.unread} unread">${a.unread}</span>`:''}
+    <span class="d" title="${st.text}"></span>
+  </button>`;
+}
+
+const crewEls = {
+  side:  document.getElementById('crew-items'),
+  roster:document.getElementById('crew-roster-items'),
+  sideWrap:  document.getElementById('crew-side'),
+  rosterWrap:document.getElementById('crew-roster'),
+  scrim: document.getElementById('crew-scrim'),
+  info:  document.getElementById('crew-info'),
+  count: document.getElementById('crew-count'),
+  rcount:document.getElementById('crew-roster-count'),
+  name:  document.getElementById('ci-name'),
+  role:  document.getElementById('ci-role'),
+  status:document.getElementById('ci-status'),
+  msg:   document.getElementById('ci-msg'),
+  profile:document.getElementById('ci-profile'),
+  stageStatus: document.getElementById('crew-stage-status'),
+  fbImg: document.getElementById('fb-img'),
+};
+let infoTimer = 0;
+
+function renderInfo(animate){
+  const agents = crewAgents();
+  const a = agents.find(x => x.id === selectedAgentId) || agents[0];
+  const fill = () => {
+    if(!a) return;
+    const st = MODEL.statusInfo(a.status);
+    crewEls.name.textContent = a.name;
+    crewEls.role.textContent = a.role;
+    crewEls.status.style.color = st.css;
+    crewEls.status.querySelector('span:last-child').textContent = st.text;
+    crewEls.msg.textContent = a.msg;
+    crewEls.msg.title = a.msg;
+    crewEls.profile.textContent = a.id;
+    crewEls.stageStatus.textContent = st.text;
+    crewEls.stageStatus.style.color = st.css;
+    crewEls.fbImg.src = avatarFor(a.id);
+  };
+  if(animate && !prefersReduced()){
+    crewEls.info.classList.add('out');
+    clearTimeout(infoTimer);
+    infoTimer = setTimeout(() => { fill(); crewEls.info.classList.remove('out'); }, 180);
+  } else {
+    clearTimeout(infoTimer);
+    crewEls.info.classList.remove('out');
+    fill();
+  }
+}
+
+function renderCrew(opts = {}){
+  const animateRoster = !!opts.animateRoster;
+  const q = crewQuery.trim().toLowerCase();
+  const match = a => !q || a.name.toLowerCase().includes(q) || a.role.toLowerCase().includes(q) || a.id.includes(q);
+  const agents = crewAgents();
+  // keep scroll positions across live refreshes
+  const sTop = crewEls.side.scrollTop, rTop = crewEls.roster.scrollTop;
+  // sidebar: the complete collection, selected agent highlighted
+  const visible = agents.filter(match);
+  crewEls.side.innerHTML = visible.map(a => crewRowHTML(a, a.id === selectedAgentId)).join('')
+    || '<div class="crew-empty">NO AGENT MATCHES</div>';
+  // right roster: derived — complete collection minus the selected agent
+  const others = MODEL.otherAgents(agents, selectedAgentId).filter(match);
+  crewEls.roster.innerHTML = others.map((a,i) => rosterRowHTML(a, i, animateRoster)).join('')
+    || '<div class="crew-empty">NO OTHER AGENTS</div>';
+  crewEls.side.scrollTop = sTop; crewEls.roster.scrollTop = rTop;
+  crewEls.count.textContent = String(visible.length);
+  crewEls.rcount.textContent = String(others.length);
+  renderInfo(opts.animateInfo);
+}
+
+/* Selecting an agent updates the real application state: the stage, both
+   lists, and currentProfile — which the console embed and Agent City use. */
+function selectAgent(id, opts = {}){
+  if(!id || !CREW.some(c => c.profile === id)) return;
+  const changed = id !== selectedAgentId;
+  selectedAgentId = id;
+  if(currentProfile !== id) currentProfile = id;
+  renderCrew({ animateRoster: changed, animateInfo: changed && opts.animateInfo !== false });
+  if(changed || opts.forceStage) window.CrewStage?.select?.(id);
+}
+
+/* Honest per-agent states from the same backend facts Agent City uses. */
+function applyCrewStatuses(s){
+  crewStatuses = MODEL.deriveStatuses(s, CREW.map(c => c.profile));
+  window.__crewStatuses = crewStatuses;   // initial paint source for the stage module
+  const t = crewNow();
+  CREW.forEach(c => { c.msg = CREW_MSG[crewStatuses[c.profile]] || CREW_MSG.offline; c.time = t; });
+  renderCrew();
+  window.CrewStage?.updateStatus?.(crewStatuses);
+}
+
 renderCrew();
+
+/* interactions */
+crewEls.side.addEventListener('click', e => {
+  const it = e.target.closest('.crew-item'); if(!it) return;
+  selectAgent(it.dataset.p);
+  if(matchMedia('(max-width:880px)').matches) closeCrewPanels();
+});
+crewEls.roster.addEventListener('click', e => {
+  const it = e.target.closest('.crew-r-row'); if(!it) return;
+  selectAgent(it.dataset.p);
+});
+document.getElementById('crew-search-input').addEventListener('input', e => {
+  crewQuery = e.target.value || '';
+  renderCrew();
+});
+document.getElementById('ci-open-hermes').addEventListener('click', () => {
+  if(selectedAgentId) openInHermes(selectedAgentId);
+});
+document.getElementById('ci-open-map').addEventListener('click', () => {
+  if(selectedAgentId) window.NEXORA.currentProfile = selectedAgentId;
+  document.querySelector('.nav-item[data-view="city"]').click();
+});
+function closeCrewPanels(){
+  crewEls.sideWrap.classList.remove('open');
+  crewEls.rosterWrap.classList.remove('open');
+  crewEls.scrim.hidden = true;
+}
+function toggleCrewPanel(wrap){
+  const open = !wrap.classList.contains('open');
+  closeCrewPanels();
+  if(open){ wrap.classList.add('open'); crewEls.scrim.hidden = false; }
+}
+document.getElementById('crew-nav-toggle').addEventListener('click', () => toggleCrewPanel(crewEls.sideWrap));
+document.getElementById('crew-roster-toggle').addEventListener('click', () => toggleCrewPanel(crewEls.rosterWrap));
+crewEls.scrim.addEventListener('click', closeCrewPanels);
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeCrewPanels(); });
 
 /* ══════ Cockpit numbers ══════ */
 const N = CREW.length;
@@ -710,10 +1002,12 @@ async function loadHermes(){
 
   window.__hermesStatus = s;
   window.City3D?.updateStatus?.(s);
+  applyCrewStatuses(s);
 }
 
 function markOffline(reason){
   window.City3D?.setOffline?.();
+  applyCrewStatuses(null);
   const gw = document.querySelector('.hero .gateway');
   gw.childNodes[1].nodeValue = 'BACKEND OFFLINE';
   gw.style.borderColor = 'rgba(150,120,100,.4)'; gw.style.color = 'var(--muted)';
@@ -725,20 +1019,24 @@ function markOffline(reason){
 function rebuildCrew(profiles){
   const prev = CREW.slice();
   CREW.length = 0;
-  profiles.forEach((p,i)=>{
+  profiles.forEach(p=>{
     const old = prev.find(x=>x.profile===p);
     CREW.push({
       name: NICK[p] || p.charAt(0).toUpperCase()+p.slice(1),
       profile: p,
       ring: RINGS[p] || '#ff6a1a',
-      msg: old ? old.msg : 'Ready.',
+      msg: old ? old.msg : 'Waiting for live status.',
       time: old ? old.time : '--:--',
       unread: old ? old.unread : 0,
-      active: i===0
     });
   });
+  // keep the selection valid across backend profile changes
+  if(!CREW.some(c => c.profile === selectedAgentId)){
+    selectedAgentId = CREW.length ? CREW[0].profile : null;
+  }
   renderCrew(); buildProfilePicks();
   window.City3D?.rebuild?.();
+  window.CrewStage?.rebuild?.();
 }
 
 /* ══════ Hermes Console: embedded managing UI (local-only feature) ══════
@@ -805,9 +1103,17 @@ function openInHermes(profile){
   window.open(consoleUrl(profile), '_blank', 'noopener');
 }
 
-/* shared with the Agent City 3D module */
+/* shared with the Agent City + Crew stage modules */
 window.NEXORA = { get CREW(){return CREW;}, get HERMES_BASE(){return HERMES_BASE;}, NICK, RINGS,
-  get currentProfile(){return currentProfile;}, set currentProfile(v){currentProfile=v;},
+  get currentProfile(){return currentProfile;},
+  /* Keep crew selection and currentProfile in sync no matter which view
+     changes it (crew stage, roster, Agent City label, console picker). */
+  set currentProfile(v){
+    if(v === currentProfile) return;
+    if(typeof selectAgent === 'function' && CREW.some(c => c.profile === v)) { selectAgent(v); return; }
+    currentProfile = v;
+  },
+  get selectedAgent(){return selectedAgentId;},
   openInHermes };
 
 /* Sparkline containers stay hidden: there is no real time-series data source
@@ -937,14 +1243,9 @@ document.getElementById('nav').addEventListener('click',e=>{
   }
 });
 
-/* crew selection → also deep-links into the Hermes managing UI */
-document.getElementById('crew-items').addEventListener('click',e=>{
-  const it=e.target.closest('.crew-item'); if(!it)return;
-  document.querySelectorAll('.crew-item').forEach(n=>n.classList.remove('active'));
-  it.classList.add('active');
-  const idx=+it.dataset.i, prof=it.dataset.p;
-  if(prof){ currentProfile=prof; openInHermes(prof); }
-});
+/* Crew selection now lives in the Crew command center block above:
+   selecting updates the stage, both lists and currentProfile; the
+   explicit "OPEN IN HERMES" action performs the old deep-link. */
 </script>
 <script type="importmap">
 {"imports":{
@@ -1289,6 +1590,343 @@ loop();
 /* initial paint from whatever the cockpit already knows */
 rebuild();
 if (window.__hermesStatus) updateStatus(window.__hermesStatus); else setOffline();
+</script>
+<script type="module">
+/* ══════════════════════════════════════════════════════════════════
+   CREW ORBITAL STAGE — selected agent as a metallic mannequin bust
+   centered between two counter-rotating rings.
+
+   · The selected mannequin stays upright and centered; it never
+     rotates with the rings.
+   · Ring A (outer): clockwise, faster, luminous gold markers.
+   · Ring B (inner): anticlockwise, slower, different plane/tilt,
+     dim champagne markers.
+   · Both rings are real 3D tori at different depths, so they pass
+     behind and in front of the bust — no static illustration.
+   · Rotation is delta-time based: identical speed at any frame rate.
+   · Materials/geometry are built ONCE; selection only tweens colors
+     and scale — nothing is rebuilt per selection.
+   · prefers-reduced-motion: rings and idle motion stop; selection
+     becomes an instant swap.
+   · The loop pauses while the Crew view is hidden and disposes the
+     renderer on pagehide. Falls back to the animated CSS/SVG panel
+     when WebGL is unavailable. */
+import * as THREE from 'three';
+
+const MODEL = window.NEXORA_MODEL;
+const crewView = document.getElementById('view-crew');
+const stageEl  = document.getElementById('crew-stage');
+const canvas   = document.getElementById('crew-canvas');
+const fallback = document.getElementById('crew-fallback');
+const reducedQ = matchMedia('(prefers-reduced-motion: reduce)');
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+} catch { renderer = null; }
+
+if (!renderer) {
+  /* Honest degradation: CSS rings + SVG mannequin keep the selection
+     experience alive without WebGL. */
+  canvas.style.display = 'none';
+  fallback.hidden = false;
+  window.CrewStage = { select(){}, rebuild(){}, updateStatus(){} };
+} else {
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+  camera.position.set(0, 1.62, 6.4);
+  camera.lookAt(0, 1.18, 0);
+
+  /* ── cinematic warm lighting ── */
+  scene.add(new THREE.HemisphereLight(0xfff1e0, 0x120d09, 0.85));
+  const key = new THREE.DirectionalLight(0xffe9d2, 1.35);
+  key.position.set(2.6, 4.4, 3.6);
+  scene.add(key);
+  const rimA = new THREE.PointLight(0xff7a2a, 26, 14, 2);   // warm amber rim
+  rimA.position.set(-2.4, 2.2, -1.8);
+  scene.add(rimA);
+  const rimB = new THREE.PointLight(0xd5b38a, 18, 14, 2);   // champagne rim
+  rimB.position.set(2.6, 1.7, -2.0);
+  scene.add(rimB);
+
+  /* ── soft orange halo behind the character ── */
+  function radialTexture(inner){
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(64, 64, 2, 64, 64, 64);
+    grad.addColorStop(0, inner);
+    grad.addColorStop(1, 'rgba(255,106,26,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(c);
+  }
+  const halo = new THREE.Mesh(
+    new THREE.PlaneGeometry(5.4, 5.4),
+    new THREE.MeshBasicMaterial({ map: radialTexture('rgba(255,122,44,0.42)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
+  );
+  halo.position.set(0, 1.3, -1.7);
+  scene.add(halo);
+
+  /* ── platform + status ring (live from the backend) ── */
+  const platform = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.5, 1.62, 0.09, 64),
+    new THREE.MeshStandardMaterial({ color: 0x14100c, roughness: 0.85, metalness: 0.2 })
+  );
+  platform.position.y = -0.05;
+  scene.add(platform);
+  const statusMat = new THREE.MeshStandardMaterial({ color: 0xa06bff, emissive: 0xa06bff, emissiveIntensity: 1.1, roughness: 0.4 });
+  const statusRing = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.028, 10, 80), statusMat);
+  statusRing.rotation.x = Math.PI / 2;
+  statusRing.position.y = 0.01;
+  scene.add(statusRing);
+
+  /* ── the mannequin: shared geometry + shared materials, built once ── */
+  const matHead = new THREE.MeshPhysicalMaterial({ color: 0x0d0c0b, metalness: 0.82, roughness: 0.24, clearcoat: 0.55, clearcoatRoughness: 0.28 });
+  const matJacket = new THREE.MeshStandardMaterial({ color: 0x171310, roughness: 0.62, metalness: 0.1 });
+  const matShirt  = new THREE.MeshStandardMaterial({ color: 0xe9e2d4, roughness: 0.7, metalness: 0 });
+  const matTie    = new THREE.MeshStandardMaterial({ color: 0x211c17, roughness: 0.5, metalness: 0.1 });
+  const matGold   = new THREE.MeshStandardMaterial({ color: 0xd5b38a, metalness: 0.9, roughness: 0.3, emissive: 0x38280f, emissiveIntensity: 0.4 });
+  const bustMats = [matHead, matJacket, matShirt, matTie, matGold];
+
+  const bust = new THREE.Group();
+  { // torso silhouette (lathe, flattened front-to-back)
+    const profile = [
+      new THREE.Vector2(0.62, 0.00), new THREE.Vector2(0.70, 0.22),
+      new THREE.Vector2(0.78, 0.52), new THREE.Vector2(0.84, 0.74),
+      new THREE.Vector2(0.72, 0.94), new THREE.Vector2(0.34, 1.04),
+    ];
+    const torso = new THREE.Mesh(new THREE.LatheGeometry(profile, 56), matJacket);
+    torso.scale.z = 0.68;
+    torso.position.y = 0.1;
+    bust.add(torso);
+    // shoulders accent + gold collar
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.028, 10, 40), matGold);
+    collar.rotation.x = Math.PI / 2;
+    collar.position.y = 1.16;
+    bust.add(collar);
+    // neck
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.145, 0.17, 0.26, 28), matHead);
+    neck.position.y = 1.22;
+    bust.add(neck);
+    // faceless glossy head — no eyes, nose, mouth, ever
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 48, 32), matHead);
+    head.scale.set(0.92, 1.14, 0.97);
+    head.position.y = 1.62;
+    bust.add(head);
+    // shirt V + lapels + tie (outfit-dependent colors, fixed geometry)
+    const shirtV = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.42, 0.05), matShirt);
+    shirtV.position.set(0, 0.92, 0.5);
+    shirtV.rotation.x = -0.12;
+    bust.add(shirtV);
+    const lapelL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.04), matGold);
+    lapelL.position.set(-0.14, 0.9, 0.53);
+    lapelL.rotation.z = 0.34;
+    bust.add(lapelL);
+    const lapelR = lapelL.clone();
+    lapelR.position.x = 0.14;
+    lapelR.rotation.z = -0.34;
+    bust.add(lapelR);
+    const tieLong = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.52, 0.035), matTie);
+    tieLong.position.set(0, 0.82, 0.545);
+    bust.add(tieLong);
+    const bowL = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.07, 0.04), matTie);
+    bowL.position.set(-0.075, 1.1, 0.5);
+    bowL.rotation.z = 0.18;
+    const bowR = bowL.clone();
+    bowR.position.x = 0.075;
+    bowR.rotation.z = -0.18;
+    bust.add(bowL, bowR);
+    bust.userData.tieParts = { tieLong, bowL, bowR };
+  }
+  scene.add(bust);
+
+  function applyOutfit(profileId){
+    const o = MODEL.outfitFor(profileId);
+    matJacket.color.set(o.jacket);
+    matShirt.color.set(o.shirt);
+    matTie.color.set(o.tie.color);
+    const { tieLong, bowL, bowR } = bust.userData.tieParts;
+    const bow = o.tie.kind === 'bow';
+    tieLong.visible = !bow;
+    bowL.visible = bowR.visible = bow;
+  }
+
+  /* ── Ring A: outer, clockwise, faster ── */
+  const ringA = new THREE.Group();
+  ringA.rotation.set(1.28, 0.16, 0);
+  const spinA = new THREE.Group();
+  ringA.add(spinA);
+  spinA.add(new THREE.Mesh(new THREE.TorusGeometry(2.3, 0.014, 8, 128),
+    new THREE.MeshStandardMaterial({ color: 0xd5b38a, emissive: 0xc98a3e, emissiveIntensity: 0.9, roughness: 0.35, metalness: 0.7 })));
+  const markA = [];
+  for (let i = 0; i < 9; i += 1) {
+    const m = new THREE.Mesh(new THREE.OctahedronGeometry(i % 3 === 0 ? 0.06 : 0.04),
+      new THREE.MeshStandardMaterial({ color: 0xf0d3a0, emissive: 0xffa64d, emissiveIntensity: 1.2, roughness: 0.3 }));
+    const a = (i / 9) * Math.PI * 2;
+    m.position.set(Math.cos(a) * 2.3, Math.sin(a) * 2.3, 0);
+    spinA.add(m);
+    markA.push(m);
+  }
+  scene.add(ringA);
+
+  /* ── Ring B: inner, anticlockwise, slower, different plane ── */
+  const ringB = new THREE.Group();
+  ringB.rotation.set(1.02, -0.58, 0.22);
+  const spinB = new THREE.Group();
+  ringB.add(spinB);
+  spinB.add(new THREE.Mesh(new THREE.TorusGeometry(1.82, 0.01, 8, 120),
+    new THREE.MeshStandardMaterial({ color: 0xb99a6e, emissive: 0x6b5230, emissiveIntensity: 0.7, roughness: 0.4, metalness: 0.6 })));
+  const markB = [];
+  for (let i = 0; i < 6; i += 1) {
+    const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.032),
+      new THREE.MeshStandardMaterial({ color: 0xdcc49a, emissive: 0xa8814a, emissiveIntensity: 0.8, roughness: 0.35 }));
+    const a = (i / 6) * Math.PI * 2 + 0.4;
+    m.position.set(Math.cos(a) * 1.82, Math.sin(a) * 1.82, 0);
+    spinB.add(m);
+    markB.push(m);
+  }
+  scene.add(ringB);
+
+  /* ── subtle atmosphere particles ── */
+  const dustGeo = new THREE.BufferGeometry();
+  const dustPos = new Float32Array(330);
+  for (let i = 0; i < 110; i += 1) {
+    const a = Math.random() * Math.PI * 2;
+    const r = 1.2 + Math.random() * 2.6;
+    dustPos[i * 3] = Math.cos(a) * r;
+    dustPos[i * 3 + 1] = Math.random() * 3.2;
+    dustPos[i * 3 + 2] = Math.sin(a) * r;
+  }
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+  const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0xd5b38a, size: 0.02, transparent: true, opacity: 0.55, depthWrite: false }));
+  scene.add(dust);
+
+  /* ── selection state machine ──
+     One bust, colors swap at the midpoint of a 520ms fade/scale tween.
+     A selection arriving mid-transition finalizes the old one first, so
+     overlapping selections can never leave the stage inconsistent. */
+  const TRANS_MS = 520;
+  let currentId = window.NEXORA?.selectedAgent || (window.NEXORA?.CREW[0]?.profile) || null;
+  let trans = null;          // { start, swapped }
+
+  function easeInOut(t){ return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+  function setOpacity(k){
+    const on = k < 0.999;
+    bustMats.forEach(m => { m.transparent = on; m.opacity = k; m.depthWrite = !on || k > 0.6; });
+  }
+  function finalizeTrans(){
+    if (!trans) return;
+    if (!trans.swapped && trans.pendingId) applyOutfit(trans.pendingId);
+    trans = null;
+    setOpacity(1);
+    bust.scale.setScalar(1);
+  }
+
+  function select(id, animate = true){
+    if (!id) return;
+    finalizeTrans();                  // never overlap transitions
+    if (id === currentId) { applyOutfit(id); applyStatusColor(); return; }
+    currentId = id;
+    if (!animate || reducedQ.matches) { applyOutfit(id); setOpacity(1); bust.scale.setScalar(1); return; }
+    trans = { start: performance.now(), swapped: false, pendingId: id };
+  }
+
+  /* ── honest status color on the platform ring ── */
+  let workingPulse = false;
+  let lastStatusMap = {};
+  function updateStatus(map){
+    lastStatusMap = map || {};
+    applyStatusColor();
+  }
+  function applyStatusColor(){
+    const key = lastStatusMap[currentId];
+    const st = MODEL.statusInfo(key);
+    statusMat.color.set(st.css);
+    statusMat.emissive.set(st.css);
+    workingPulse = key === 'working';
+  }
+
+  /* ── resize keeps the center stable at any viewport ── */
+  function resize(){
+    const w = stageEl.clientWidth, h = stageEl.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    // pull back on narrow viewports so the rings never clip
+    const fit = Math.min(1, Math.max(0.62, w / 900));
+    camera.position.set(0, 1.62, 6.4 / fit * 0.82);
+    camera.lookAt(0, 1.18, 0);
+    camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(stageEl);
+  resize();
+
+  /* ── delta-time render loop ── */
+  const clock = new THREE.Clock();
+  let raf = 0;
+  function loop(){
+    raf = requestAnimationFrame(loop);
+    if (!crewView.classList.contains('active')) return;
+    const dt = Math.min(clock.getDelta(), 0.1);
+    const t = clock.elapsedTime;
+    const still = reducedQ.matches;
+    if (!still) {
+      // Ring A: clockwise (negative), faster. Ring B: anticlockwise, slower.
+      spinA.rotation.z -= 0.45 * dt;
+      spinB.rotation.z += 0.22 * dt;
+      // idle life: gentle float + slow head-turn + breathing
+      bust.position.y = Math.sin(t * 1.1) * 0.035;
+      bust.rotation.y = Math.sin(t * 0.4) * 0.14;
+      bust.scale.y = bust.scale.x * (1 + Math.sin(t * 1.7) * 0.006);
+      dust.rotation.y += dt * 0.03;
+      halo.material.opacity = 0.85 + Math.sin(t * 1.3) * 0.12;
+      markA.forEach((m, i) => m.rotation.y += dt * (1.2 + (i % 3) * 0.4));
+    }
+    statusMat.emissiveIntensity = workingPulse && !still ? 1.0 + 0.6 * (0.5 + 0.5 * Math.sin(t * 4)) : 1.1;
+    if (trans) {
+      const p = Math.min(1, (performance.now() - trans.start) / TRANS_MS);
+      if (p < 0.5) {
+        const k = easeInOut(p * 2);
+        setOpacity(1 - k);
+        bust.scale.setScalar(1 - 0.08 * k);
+      } else {
+        if (!trans.swapped) { applyOutfit(trans.pendingId); trans.swapped = true; applyStatusColor(); }
+        const k = easeInOut((p - 0.5) * 2);
+        setOpacity(k);
+        bust.scale.setScalar(0.92 + 0.08 * k);
+      }
+      if (p >= 1) { trans = null; setOpacity(1); bust.scale.setScalar(1); }
+    }
+    renderer.render(scene, camera);
+  }
+  loop();
+
+  window.addEventListener('pagehide', () => {
+    cancelAnimationFrame(raf);
+    renderer.dispose();
+    scene.traverse(o => { if (o.isMesh || o.isPoints) { o.geometry?.dispose?.(); } });
+    bustMats.forEach(m => m.dispose());
+  }, { once: true });
+
+  /* ── API used by the classic crew script ── */
+  window.CrewStage = {
+    select,
+    rebuild(){ if (currentId) applyOutfit(currentId); },
+    updateStatus,
+    /* read-only handles for automated verification of ring motion */
+    get ringAngles(){ return Object.freeze({ a: spinA.rotation.z, b: spinB.rotation.z }); },
+    get ringSpeeds(){ return Object.freeze({ a: -0.45, b: 0.22 }); },   // rad/s, signs = direction
+    get selected(){ return currentId; },
+  };
+
+  // initial paint
+  if (currentId) applyOutfit(currentId);
+  updateStatus(window.__crewStatuses || {});
+}
 </script>
 </body>
 </html>

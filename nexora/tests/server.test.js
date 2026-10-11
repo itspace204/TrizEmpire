@@ -77,6 +77,20 @@ test('serves vendored same-origin modules', async () => {
   });
 });
 
+test('serves the shared crew model with a JavaScript content type', async () => {
+  await withServer(async base => {
+    const response = await fetch(`${base}/crew/crew-model.js`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type'), /javascript/);
+    // The UI refuses to run it otherwise (strict MIME checking), so pin it.
+    const body = await response.text();
+    assert.match(body, /NEXORA_MODEL/);
+    // Non-model paths inside the allowlisted folder still obey the rules.
+    const dotfile = await fetch(`${base}/crew/.hidden`);
+    assert.equal(dotfile.status, 404);
+  });
+});
+
 test('unknown API paths return JSON 404, not the UI page', async () => {
   await withServer(async base => {
     const response = await fetch(`${base}/api/does-not-exist`);

@@ -47,7 +47,7 @@ const MIME = {
 };
 
 /* Only these top-level entries of the app directory are ever served. */
-const STATIC_ALLOWLIST = new Set(['index.html', 'vendor']);
+const STATIC_ALLOWLIST = new Set(['index.html', 'vendor', 'crew']);
 
 function send(res, status, body, type = 'text/plain; charset=utf-8', method = 'GET') {
   res.statusCode = status;
