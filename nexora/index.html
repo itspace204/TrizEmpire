@@ -528,11 +528,11 @@ body{
    Wired to the five live Hermes profiles on this machine.
    Each has: name, profile id, accent ring color, last status line, time, unread. */
 const CREW = [
-  {name:"Orchestrator", profile:"default",    ring:"#ff6a1a", msg:"Plan approved. Starting now.",      time:"09:12", unread:0, active:true},
-  {name:"Research",     profile:"research",   ring:"#3aa0ff", msg:"3 sources found.",                  time:"09:10", unread:2},
-  {name:"Writer",       profile:"writer",     ring:"#b06aff", msg:"Draft ready for review",            time:"09:02", unread:0},
-  {name:"Developer",    profile:"developer",  ring:"#2fd08a", msg:"Deployed ✓ tests pass",             time:"08:55", unread:0},
-  {name:"Data",         profile:"data",       ring:"#ff5aa0", msg:"Weekly numbers are in",             time:"08:46", unread:1},
+  {name:"Orchestrator", profile:"default",    ring:"#ff6a1a", msg:"Waiting for live status.",              time:"--:--", unread:0, active:true},
+  {name:"Research",     profile:"research",   ring:"#3aa0ff", msg:"Waiting for live status.",              time:"--:--", unread:0},
+  {name:"Writer",       profile:"writer",     ring:"#b06aff", msg:"Waiting for live status.",              time:"--:--", unread:0},
+  {name:"Developer",    profile:"developer",  ring:"#2fd08a", msg:"Waiting for live status.",              time:"--:--", unread:0},
+  {name:"Data",         profile:"data",       ring:"#ff5aa0", msg:"Waiting for live status.",              time:"--:--", unread:0},
 ];
 
 /* Isolated workspaces — map real profiles onto the four-box layout.
@@ -627,7 +627,6 @@ async function loadHermes(){
       rebuildCrew(s.profiles);
       const n = s.profiles.length;
       document.getElementById('hero-line').textContent = `a ${n}-agent engine.`;
-      document.getElementById('odo-a').textContent = String(n).padStart(2,'0');
     }
 
     /* gateway state → hero pill + sidebar */
@@ -642,7 +641,7 @@ async function loadHermes(){
     const chip = document.querySelector('.status-chip');
     chip.childNodes[1].nodeValue = 'System status: ' + ov.charAt(0).toUpperCase()+ov.slice(1);
 
-    /* real disk usage from the backend (CPU/RAM aren't exposed → keep illustrative) */
+    /* Only render disk telemetry when the backend returns a numeric value. CPU/RAM remain unavailable. */
     if(s.disk && typeof s.disk.used_percent === 'number'){
       setMeter('f-disk','m-disk', Math.round(s.disk.used_percent));
     }
