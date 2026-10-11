@@ -29,12 +29,12 @@ test('health endpoint returns a minimal status and security headers', async () =
   });
 });
 
-test('serves the NEXORA entry page', async () => {
+test('serves the TrizEmpire entry page', async () => {
   await withServer(async base => {
     const response = await fetch(`${base}/`);
     assert.equal(response.status, 200);
     assert.match(response.headers.get('content-type'), /text\/html/);
-    assert.match(await response.text(), /NEXORA/);
+    assert.match(await response.text(), /TrizEmpire/);
   });
 });
 
