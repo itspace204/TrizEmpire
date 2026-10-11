@@ -1,13 +1,15 @@
 {
   "name": "nexora",
-  "version": "0.21.6",
-  "description": "NEXORA operator system — cockpit UI wired to the live Hermes managing backend.",
+  "version": "0.21.7",
+  "description": "NEXORA operator UI for a local Hermes managing backend.",
   "private": true,
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "check": "node --check server.js && node --check tests/server.test.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=20"
