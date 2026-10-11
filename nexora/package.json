@@ -1,6 +1,6 @@
 {
   "name": "trizempire",
-  "version": "0.21.7",
+  "version": "0.22.0",
   "description": "TrizEmpire operator UI for a local Hermes managing backend.",
   "private": true,
   "type": "commonjs",
@@ -8,7 +8,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "check": "node --check server.js && node --check tests/server.test.js",
+    "check": "node scripts/check-syntax.js",
+    "hash-password": "node scripts/hash-password.js",
     "test": "node --test"
   },
   "engines": {
