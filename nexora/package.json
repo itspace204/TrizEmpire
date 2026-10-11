@@ -1,7 +1,7 @@
 {
-  "name": "nexora",
+  "name": "trizempire",
   "version": "0.21.7",
-  "description": "NEXORA operator UI for a local Hermes managing backend.",
+  "description": "TrizEmpire operator UI for a local Hermes managing backend.",
   "private": true,
   "type": "commonjs",
   "main": "server.js",
