@@ -788,8 +788,7 @@ document.getElementById('crew-items').addEventListener('click',e=>{
 </script>
 <script type="importmap">
 {"imports":{
-  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  "three":"/vendor/three.module.min.js"
 }}
 </script>
 <script type="module">
@@ -798,9 +797,11 @@ document.getElementById('crew-items').addEventListener('click',e=>{
    and the dot on its floating label show live status from the Hermes backend:
      working (red) · ready (green) · idle (blue) · offline (purple)
    Mouse: left-drag orbit · wheel zoom · right-drag pan.
-   Touch: one finger orbit · pinch zoom · two-finger pan. */
+   Touch: one finger orbit · pinch zoom · two-finger pan.
+   Three.js is vendored locally (MIT, see vendor/THREE-LICENSE.txt) so the
+   page works offline and satisfies the strict same-origin CSP. */
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { OrbitControls } from '/vendor/OrbitControls.js';
 
 const ST = {
   working:{hex:0xff4d4d, css:'#ff4d4d', text:'WORKING'},
