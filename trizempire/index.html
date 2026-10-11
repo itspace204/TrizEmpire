@@ -806,7 +806,7 @@ function openInHermes(profile){
 }
 
 /* shared with the Agent City 3D module */
-window.NEXORA = { get CREW(){return CREW;}, get HERMES_BASE(){return HERMES_BASE;}, NICK, RINGS,
+window.TrizEmpire = { get CREW(){return CREW;}, get HERMES_BASE(){return HERMES_BASE;}, NICK, RINGS,
   get currentProfile(){return currentProfile;}, set currentProfile(v){currentProfile=v;},
   openInHermes };
 
@@ -1046,7 +1046,7 @@ function makeLabel(name, profile, hubFlag){
   el.innerHTML = `<span class="d"></span><b>${name}</b><i>···</i>`;
   el.addEventListener('click', e => {
     e.stopPropagation();
-    if (profile) { window.NEXORA.currentProfile = profile; window.NEXORA.openInHermes(profile); }
+    if (profile) { window.TrizEmpire.currentProfile = profile; window.TrizEmpire.openInHermes(profile); }
   });
   labelLayer.appendChild(el);
   return el;
@@ -1187,7 +1187,7 @@ function rebuild(){
   pods.splice(0).forEach(p => { labelLayer.removeChild(p.label); });
   disposeGroup(city);
   city.clear();
-  const crew = (window.NEXORA && window.NEXORA.CREW) || [];
+  const crew = (window.TrizEmpire && window.TrizEmpire.CREW) || [];
   if (!crew.length) return;
   const hubCrew = crew.find(c => c.profile === 'default') || crew[0];
   pods.push(buildHub(hubCrew.name.toUpperCase(), hubCrew.profile));
@@ -1204,13 +1204,13 @@ function applyStatuses(){
 }
 
 function updateStatus(s){
-  const crew = (window.NEXORA && window.NEXORA.CREW) || [];
+  const crew = (window.TrizEmpire && window.TrizEmpire.CREW) || [];
   statuses = computeStatuses(s, crew.map(c => c.profile));
   applyStatuses();
 }
 
 function setOffline(){
-  const crew = (window.NEXORA && window.NEXORA.CREW) || [];
+  const crew = (window.TrizEmpire && window.TrizEmpire.CREW) || [];
   statuses = computeStatuses(null, crew.map(c => c.profile));
   applyStatuses();
 }
@@ -1239,8 +1239,8 @@ canvas.addEventListener('pointermove', e => {
 });
 canvas.addEventListener('click', () => {
   if (!hotPod || !hotPod.profile) return;
-  window.NEXORA.currentProfile = hotPod.profile;
-  window.NEXORA.openInHermes(hotPod.profile);
+  window.TrizEmpire.currentProfile = hotPod.profile;
+  window.TrizEmpire.openInHermes(hotPod.profile);
 });
 
 /* ── label projection + render loop ── */
