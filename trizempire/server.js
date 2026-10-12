@@ -343,7 +343,7 @@ function createServer(options = {}) {
 }
 
 if (require.main === module) {
-  /* Load nexora/.env if present (OS env always wins over the file). */
+  /* Load trizempire/.env if present (OS env always wins over the file). */
   const loadedEnv = loadEnvFile(path.join(DEFAULT_ROOT, '.env'));
   const cfg = resolveOptions();
   const server = createServer();

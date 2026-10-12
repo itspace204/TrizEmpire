@@ -1,4 +1,4 @@
-# TrizEmpire (nexora) — systemd unit for a Linux host.
+# TrizEmpire — systemd unit for a Linux host.
 #
 # Install:
 #   install -m 0644 deploy/trizempire.service /etc/systemd/system/trizempire.service
@@ -7,11 +7,11 @@
 #   journalctl -u trizempire -f
 #
 # Assumptions — adjust every one of them to your host:
-#   * app cloned at /opt/trizempire/nexora
+#   * app cloned at /opt/trizempire/trizempire
 #   * node at /usr/bin/node            (confirm with: command -v node)
-#   * unprivileged user/group "nexora"  (useradd --system --home /opt/trizempire \
-#       --shell /usr/sbin/nologin nexora)
-#   * env file at /etc/trizempire/nexora.env (root-owned, chmod 0600)
+#   * unprivileged user/group "trizempire"  (useradd --system --home /opt/trizempire \
+#       --shell /usr/sbin/nologin trizempire)
+#   * env file at /etc/trizempire/trizempire.env (root-owned, chmod 0600)
 #
 # The env file uses systemd's EnvironmentFile syntax (KEY=value per line),
 # NOT shell syntax — no `export`, and values are literal, so the $ characters
@@ -19,7 +19,7 @@
 # least TRIZ_ADMIN_PASSWORD_HASH: NODE_ENV=production below makes the server
 # refuse to start without one. Anything set there overrides the Environment=
 # defaults below, and the whole process environment overrides a leftover
-# nexora/.env file.
+# trizempire/.env file.
 #
 # Deliberately absent:
 #   MemoryDenyWriteExecute=  breaks V8's JIT — Node will not start.
@@ -28,17 +28,17 @@
 #                            if node or the app live under /home (nvm).
 
 [Unit]
-Description=TrizEmpire operator UI (nexora)
+Description=TrizEmpire operator UI
 Documentation=https://github.com/itspace204/TrizEmpire
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=exec
-User=nexora
-Group=nexora
-WorkingDirectory=/opt/trizempire/nexora
-EnvironmentFile=/etc/trizempire/nexora.env
+User=trizempire
+Group=trizempire
+WorkingDirectory=/opt/trizempire/trizempire
+EnvironmentFile=/etc/trizempire/trizempire.env
 # Loopback + fixed port: this is exactly what deploy/trizempire-nginx.conf
 # proxies to, and production refuses PORT=0 (ephemeral ports are for tests).
 Environment=HOST=127.0.0.1
@@ -48,7 +48,7 @@ Environment=NODE_ENV=production
 # operator machine's 127.0.0.1:9119. Set HERMES_PUBLIC_URL in the env file
 # only when the dashboard is genuinely reachable from the browser.
 Environment=HERMES_PUBLIC_URL=
-ExecStart=/usr/bin/node /opt/trizempire/nexora/server.js
+ExecStart=/usr/bin/node /opt/trizempire/trizempire/server.js
 Restart=on-failure
 RestartSec=2s
 StandardOutput=journal

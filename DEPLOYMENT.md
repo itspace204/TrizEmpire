@@ -36,7 +36,7 @@ There is no build step.
 `deploy/` carries a committed deployment bundle for a Linux host:
 
 - [`deploy/trizempire.service`](deploy/trizempire.service) — hardened systemd
-  unit: dedicated unprivileged `nexora` user, direct `node` invocation (no npm
+  unit: dedicated unprivileged `trizempire` user, direct `node` invocation (no npm
   wrapper), loopback bind on `HOST=127.0.0.1`/`PORT=57004`,
   `NODE_ENV=production`, journal logging, and sandboxing that is safe for V8's
   JIT (deliberately **no** `MemoryDenyWriteExecute=`, which would stop Node
@@ -48,7 +48,7 @@ There is no build step.
   origin check depends on.
 
 The unit's `HOST`/`PORT` and the snippet's `proxy_pass` target are pinned to
-match each other (and to the app's defaults) by `nexora/tests/deploy.test.js`,
+match each other (and to the app's defaults) by `trizempire/tests/deploy.test.js`,
 which also checks the TLS policy, the proxy headers and the sandbox directives.
 Adjust both files together if you change the port or hostname.
 
@@ -56,17 +56,17 @@ Adjust both files together if you change the port or hostname.
 
 ```sh
 # 1. App and runtime (adjust the paths if your node or clone live elsewhere)
-sudo useradd --system --home /opt/trizempire --shell /usr/sbin/nologin nexora
+sudo useradd --system --home /opt/trizempire --shell /usr/sbin/nologin trizempire
 sudo git clone https://github.com/itspace204/TrizEmpire.git /opt/trizempire
 command -v node                    # must be /usr/bin/node, or edit ExecStart
 
 # 2. Secrets: systemd EnvironmentFile syntax — KEY=value, no `export`.
 #    Values are literal, so the $ characters in a scrypt hash are safe.
-cd /opt/trizempire/nexora
+cd /opt/trizempire/trizempire
 node scripts/hash-password.js      # type the admin password; prints scrypt$…
 sudo install -d -m 0755 /etc/trizempire
-sudoedit /etc/trizempire/nexora.env    # TRIZ_ADMIN_PASSWORD_HASH='scrypt$…'
-sudo chmod 0600 /etc/trizempire/nexora.env
+sudoedit /etc/trizempire/trizempire.env    # TRIZ_ADMIN_PASSWORD_HASH='scrypt$…'
+sudo chmod 0600 /etc/trizempire/trizempire.env
 
 # 3. Unit
 sudo install -m 0644 deploy/trizempire.service /etc/systemd/system/trizempire.service
@@ -120,20 +120,20 @@ on a first rollout until HTTPS is verified, and do not add `preload`.
 ## Environment variables
 
 All configuration is via environment variables. The canonical template is
-[`nexora/.env.example`](nexora/.env.example) — copy it to `nexora/.env` and
+[`trizempire/.env.example`](trizempire/.env.example) — copy it to `trizempire/.env` and
 edit the copy. Placeholder values only — never commit real values.
 
 Loading semantics:
 
-- The server loads `nexora/.env` at startup (plain `npm start`).
+- The server loads `trizempire/.env` at startup (plain `npm start`).
 - Variables already set in the operating-system environment **always take
   precedence** over the file — process managers and hosting platforms win.
 - `.env` is gitignored; `.env.example` is tracked. Verify with
-  `git check-ignore nexora/.env`.
+  `git check-ignore trizempire/.env`.
 - There is no `.env` loading during tests: test configuration is injected
   explicitly, so suites stay hermetic.
 
-Startup validation (in `nexora/lib/config.js`) fails fast with the variable
+Startup validation (in `trizempire/lib/config.js`) fails fast with the variable
 name — never the value — when:
 
 - `PORT` is not an integer 0–65535, or is `0` while `NODE_ENV=production`
@@ -172,7 +172,7 @@ name — never the value — when:
 ```sh
 cd trizempire
 node scripts/hash-password.js      # reads the password from stdin, prints the hash
-# put the printed value in nexora/.env:
+# put the printed value in trizempire/.env:
 #   TRIZ_ADMIN_PASSWORD_HASH='scrypt$16384$8$1$…'
 ```
 
@@ -201,7 +201,7 @@ The app reads the operating-system environment, so any platform works:
 ### Starting and stopping
 
 ```sh
-cd nexora
+cd trizempire
 npm start        # foreground; Ctrl+C stops the server
 
 # on a Linux host with the deployment bundle installed:
@@ -293,7 +293,7 @@ Hermes keeps `/api/profiles*` off its public path list (only `/api/status` and
 ```sh
 # 1. On the Hermes machine, pin the dashboard session token:
 HERMES_DASHBOARD_SESSION_TOKEN='generate-a-long-random-value' hermes dashboard
-# 2. Repeat that exact value in nexora/.env:
+# 2. Repeat that exact value in trizempire/.env:
 #    HERMES_SESSION_TOKEN=generate-a-long-random-value
 # 3. Restart TrizEmpire and reload the Crew view.
 ```

@@ -34,7 +34,7 @@ No `npm install` is required — the server uses only Node.js built-ins and serv
 
 ### Configuration (`.env`)
 
-All configuration is via environment variables; [nexora/.env.example](nexora/.env.example) documents every variable the code actually reads. The server loads `nexora/.env` at startup (plain `npm start`); variables already set in the operating-system environment always win over the file. `.env` is gitignored — copy the template, never commit your copy. The full variable table, validation rules and hosting guidance are in [DEPLOYMENT.md](DEPLOYMENT.md).
+All configuration is via environment variables; [trizempire/.env.example](trizempire/.env.example) documents every variable the code actually reads. The server loads `trizempire/.env` at startup (plain `npm start`); variables already set in the operating-system environment always win over the file. `.env` is gitignored — copy the template, never commit your copy. The full variable table, validation rules and hosting guidance are in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 The server validates configuration at startup and fails fast with a clear message (variable name, never the value): invalid ports, malformed URLs, unknown `NODE_ENV`, and — in production — missing authentication or `PORT=0` are all rejected before the first request.
 
@@ -63,7 +63,7 @@ npm test          # 63 tests: server, auth, sessions, CSRF, rate limiting,
 
 ## Configuration
 
-All via environment variables — template in [nexora/.env.example](nexora/.env.example), full table in [DEPLOYMENT.md](DEPLOYMENT.md). Highlights:
+All via environment variables — template in [trizempire/.env.example](trizempire/.env.example), full table in [DEPLOYMENT.md](DEPLOYMENT.md). Highlights:
 
 - `HOST` defaults to `127.0.0.1`; non-loopback binds require `ALLOW_REMOTE_HOST=true` **and** configured auth.
 - `NODE_ENV=production` requires `TRIZ_ADMIN_PASSWORD_HASH` and a fixed `PORT` — the server refuses to start otherwise.

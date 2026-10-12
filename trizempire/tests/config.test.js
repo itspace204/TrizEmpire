@@ -184,12 +184,12 @@ test('loadEnvFile on a missing file is a safe no-op', () => {
 
 test('.env is ignored by Git and .env.example is tracked', { skip: !fs.existsSync(path.join(REPO_ROOT, '.git')) }, () => {
   const check = args => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' });
-  const envIgnored = check(['check-ignore', 'nexora/.env']);
-  assert.equal(envIgnored.status, 0, 'nexora/.env must be ignored');
-  const localIgnored = check(['check-ignore', 'nexora/.env.local']);
-  assert.equal(localIgnored.status, 0, 'nexora/.env.local must be ignored');
-  const exampleIgnored = check(['check-ignore', 'nexora/.env.example']);
-  assert.notEqual(exampleIgnored.status, 0, 'nexora/.env.example must NOT be ignored');
+  const envIgnored = check(['check-ignore', 'trizempire/.env']);
+  assert.equal(envIgnored.status, 0, 'trizempire/.env must be ignored');
+  const localIgnored = check(['check-ignore', 'trizempire/.env.local']);
+  assert.equal(localIgnored.status, 0, 'trizempire/.env.local must be ignored');
+  const exampleIgnored = check(['check-ignore', 'trizempire/.env.example']);
+  assert.notEqual(exampleIgnored.status, 0, 'trizempire/.env.example must NOT be ignored');
 });
 
 /* ── .env.example hygiene ─────────────────────────────────────────────── */

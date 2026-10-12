@@ -27,7 +27,7 @@ Binding behavior:
   (`lib/config.js`) and fails fast naming the *variable*, never the value —
   so validation errors and logs cannot leak secrets. `PORT=0` (ephemeral) is
   rejected in production. Local `.env` files are gitignored; the server
-  loads `nexora/.env` at startup with OS environment taking precedence.
+  loads `trizempire/.env` at startup with OS environment taking precedence.
 - **Sessions:** random 32-byte tokens held server-side with idle and absolute
   expiry; `HttpOnly`, `SameSite=Strict` cookies (`Secure` in production).
 - **CSRF:** state-changing endpoints require the `X-Triz-CSRF` header and a
