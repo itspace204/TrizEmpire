@@ -8,15 +8,14 @@ TrizEmpire is a Node.js operator interface for a local [Hermes](https://github.c
 
 ## Repository layout
 
-- `nexora/index.html` — operator UI (cockpit, crew, Agent City, console embed, login).
-- `nexora/server.js` — zero-dependency Node.js server: static delivery (allowlisted), auth, Hermes proxy, health endpoints.
-- `nexora/lib/` — `auth.js` (scrypt, sessions, rate limiting, CSRF), `hermes.js` (upstream proxy), `security.js` (headers/CSP).
-- `nexora/vendor/` — vendored Three.js (MIT, pinned; `vendor/THREE-LICENSE.txt`).
-- `nexora/scripts/` — `hash-password.js` (create password hashes), `check-syntax.js` (cross-platform syntax check).
-- `nexora/tests/` — automated test suite (`node:test`, no dependencies).
-- `.github/workflows/nexora-checks.yml` — Gitleaks + syntax + tests on Node 20/22/24.
-- `deploy/` — committed deployment bundle for a Linux host: hardened systemd unit (`trizempire.service`) and nginx TLS snippet (`trizempire-nginx.conf`).
-- `DEPLOYMENT.md` — production deployment guide.
+- `trizempire/index.html` — operator UI (cockpit, crew, Agent City, console embed, login).
+- `trizempire/server.js` — zero-dependency Node.js server: static delivery (allowlisted), auth, Hermes proxy, health endpoints.
+- `trizempire/lib/` — `auth.js` (scrypt, sessions, rate limiting, CSRF), `hermes.js` (upstream proxy), `security.js` (headers/CSP).
+- `trizempire/vendor/` — vendored Three.js (MIT, pinned; `vendor/THREE-LICENSE.txt`).
+- `trizempire/scripts/` — `hash-password.js` (create password hashes), `check-syntax.js` (cross-platform syntax check).
+- `trizempire/tests/` — automated test suite (`node:test`, no dependencies).
+- `.github/workflows/trizempire-checks.yml` — Gitleaks + syntax + tests on Node 20/22/24.
+- `deploy/` — committed deployment bundle for a Linux host: hardened systemd unit (`trizempire.service`) and nginx TLS snippet (`trizempire-nginx.conf`).- `DEPLOYMENT.md` — production deployment guide.
 
 ## Requirements
 
@@ -26,7 +25,7 @@ TrizEmpire is a Node.js operator interface for a local [Hermes](https://github.c
 ## Run locally
 
 ```sh
-cd nexora
+cd trizempire
 cp .env.example .env    # optional: local defaults; edit as needed
 npm start                # http://127.0.0.1:57004
 ```
@@ -42,7 +41,7 @@ The server validates configuration at startup and fails fast with a clear messag
 ### Enable login (required for any remote exposure)
 
 ```sh
-cd nexora
+cd trizempire
 node scripts/hash-password.js        # paste password on stdin; prints scrypt hash
 # put the printed hash in .env as TRIZ_ADMIN_PASSWORD_HASH='scrypt$…'
 npm start
@@ -53,7 +52,7 @@ Sign in as `admin` with the password you hashed. Optionally set `TRIZ_OPERATOR_P
 ## Checks and tests
 
 ```sh
-cd nexora
+cd trizempire
 npm run check     # syntax check across the project
 npm test          # 63 tests: server, auth, sessions, CSRF, rate limiting,
                   # proxy states, traversal/symlink protection, headers,
@@ -94,4 +93,4 @@ The browser never assumes `127.0.0.1:9119` exists: live data comes from the serv
 
 ## License
 
-Original TrizEmpire project code is licensed under the MIT License; see [LICENSE](LICENSE). The vendored Three.js library is MIT-licensed separately (`nexora/vendor/THREE-LICENSE.txt`). Web fonts (Google Fonts) and any third-party assets carry their own terms — verify and preserve those separately.
+Original TrizEmpire project code is licensed under the MIT License; see [LICENSE](LICENSE). The vendored Three.js library is MIT-licensed separately (`trizempire/vendor/THREE-LICENSE.txt`). Web fonts (Google Fonts) and any third-party assets carry their own terms — verify and preserve those separately.

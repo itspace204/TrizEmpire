@@ -934,7 +934,7 @@ document.getElementById('ci-open-hermes').addEventListener('click', () => {
   if(selectedAgentId) openInHermes(selectedAgentId);
 });
 document.getElementById('ci-open-map').addEventListener('click', () => {
-  if(selectedAgentId) window.NEXORA.currentProfile = selectedAgentId;
+  if(selectedAgentId) window.TrizEmpire.currentProfile = selectedAgentId;
   document.querySelector('.nav-item[data-view="city"]').click();
 });
 function closeCrewPanels(){
@@ -1158,7 +1158,7 @@ function openInHermes(profile){
 }
 
 /* shared with the Agent City + Crew stage modules */
-window.NEXORA = { get CREW(){return CREW;}, get HERMES_BASE(){return HERMES_BASE;}, NICK, RINGS,
+window.TrizEmpire = { get CREW(){return CREW;}, get HERMES_BASE(){return HERMES_BASE;}, NICK, RINGS,
   get currentProfile(){return currentProfile;},
   /* Keep crew selection and currentProfile in sync no matter which view
      changes it (crew stage, roster, Agent City label, console picker). */
@@ -1401,7 +1401,7 @@ function makeLabel(name, profile, hubFlag){
   el.innerHTML = `<span class="d"></span><b>${name}</b><i>···</i>`;
   el.addEventListener('click', e => {
     e.stopPropagation();
-    if (profile) { window.NEXORA.currentProfile = profile; window.NEXORA.openInHermes(profile); }
+    if (profile) { window.TrizEmpire.currentProfile = profile; window.TrizEmpire.openInHermes(profile); }
   });
   labelLayer.appendChild(el);
   return el;
@@ -1542,7 +1542,7 @@ function rebuild(){
   pods.splice(0).forEach(p => { labelLayer.removeChild(p.label); });
   disposeGroup(city);
   city.clear();
-  const crew = (window.NEXORA && window.NEXORA.CREW) || [];
+  const crew = (window.TrizEmpire && window.TrizEmpire.CREW) || [];
   if (!crew.length) return;
   const hubCrew = crew.find(c => c.profile === 'default') || crew[0];
   pods.push(buildHub(hubCrew.name.toUpperCase(), hubCrew.profile));
@@ -1559,13 +1559,13 @@ function applyStatuses(){
 }
 
 function updateStatus(s){
-  const crew = (window.NEXORA && window.NEXORA.CREW) || [];
+  const crew = (window.TrizEmpire && window.TrizEmpire.CREW) || [];
   statuses = computeStatuses(s, crew.map(c => c.profile));
   applyStatuses();
 }
 
 function setOffline(){
-  const crew = (window.NEXORA && window.NEXORA.CREW) || [];
+  const crew = (window.TrizEmpire && window.TrizEmpire.CREW) || [];
   statuses = computeStatuses(null, crew.map(c => c.profile));
   applyStatuses();
 }
@@ -1594,8 +1594,8 @@ canvas.addEventListener('pointermove', e => {
 });
 canvas.addEventListener('click', () => {
   if (!hotPod || !hotPod.profile) return;
-  window.NEXORA.currentProfile = hotPod.profile;
-  window.NEXORA.openInHermes(hotPod.profile);
+  window.TrizEmpire.currentProfile = hotPod.profile;
+  window.TrizEmpire.openInHermes(hotPod.profile);
 });
 
 /* ── label projection + render loop ── */
@@ -1864,7 +1864,7 @@ if (!renderer) {
      A selection arriving mid-transition finalizes the old one first, so
      overlapping selections can never leave the stage inconsistent. */
   const TRANS_MS = 520;
-  let currentId = window.NEXORA?.selectedAgent || (window.NEXORA?.CREW[0]?.profile) || null;
+  let currentId = window.TrizEmpire?.selectedAgent || (window.TrizEmpire?.CREW[0]?.profile) || null;
   let trans = null;          // { start, swapped }
 
   function easeInOut(t){ return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
