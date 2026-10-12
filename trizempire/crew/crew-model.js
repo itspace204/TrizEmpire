@@ -133,9 +133,11 @@ function deriveStatusesFromAgents(facts, profiles, status) {
 /* The cockpit's ISOLATED WORKSPACES cards are an organizational view over
  * the SAME live profiles the crew uses. Membership is explicit here — one
  * home per profile — so a card can never silently duplicate an agent.
- * Profiles this table does not mention (the live Hermes list can grow)
- * belong to no card and stay reachable through the Crew view; the Client
- * card stays honestly empty until an operator assigns agents here. */
+ * Defaults below ship with the Client card honestly empty; an operator
+ * assigns agents to it (and rearranges any card) through the UI, and the
+ * server persists the mapping — see withAssignments(). Profiles no table
+ * mentions (the live Hermes list can grow) belong to no card and stay
+ * reachable through the Crew view. */
 const WORKSPACES = [
   { id: 'content',  name: 'Content',  hero: true,  profiles: ['writer', 'research'] },
   { id: 'work',     name: 'Work',     hero: false, profiles: ['developer', 'data'] },
@@ -156,6 +158,29 @@ function agentsInWorkspace(workspace, crew) {
 /* Which workspace owns this profile — null when unassigned. */
 function workspaceForProfile(profile) {
   return WORKSPACES.find(ws => Array.isArray(ws.profiles) && ws.profiles.includes(profile)) || null;
+}
+
+/* Operator overrides, persisted by the server (PUT /api/workspaces) and
+ * handed back on load (GET /api/workspaces). Pure: returns a NEW workspace
+ * array — the default table is never mutated, so a bad assignment can always
+ * be escaped by falling back to the defaults. Only workspace ids present in
+ * `assignments` are replaced; everything else keeps its default membership.
+ * The server validates the map (known ids, one home per profile) before it
+ * is ever stored; here unknown ids are simply skipped, never trusted. */
+function withAssignments(workspaces, assignments) {
+  const base = Array.isArray(workspaces) ? workspaces : [];
+  const map = (assignments && typeof assignments === 'object' && !Array.isArray(assignments))
+    ? assignments
+    : {};
+  return base.map(ws => {
+    if (!Object.prototype.hasOwnProperty.call(map, ws.id)) {
+      return Object.assign({}, ws, { profiles: (Array.isArray(ws.profiles) ? ws.profiles : []).slice() });
+    }
+    const ids = Array.isArray(map[ws.id])
+      ? map[ws.id].filter(id => typeof id === 'string' && id.length > 0)
+      : [];
+    return Object.assign({}, ws, { profiles: ids });
+  });
 }
 
 /* ── derived roster ────────────────────────────────────────────────── */
@@ -226,6 +251,7 @@ const NEXORA_MODEL = {
   deriveStatusesFromAgents,
   agentsInWorkspace,
   workspaceForProfile,
+  withAssignments,
   otherAgents,
   mannequinSVG,
   avatarDataURI,

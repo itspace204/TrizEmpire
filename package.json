@@ -1,0 +1,9 @@
+{
+  "name": "trizempire-deploy-root",
+  "private": true,
+  "description": "Deployment root for Vercel (api/index.js). The TrizEmpire app itself lives in trizempire/.",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  }
+}

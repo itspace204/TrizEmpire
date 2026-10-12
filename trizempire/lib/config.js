@@ -21,6 +21,7 @@
  */
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { parseHash } = require('./auth');
 
@@ -147,6 +148,21 @@ function resolveConfig(options = {}, env = process.env) {
     throw new Error('TRIZ_SESSION_TTL_MINUTES and TRIZ_SESSION_ABS_MINUTES must be positive integers.');
   }
 
+  /* Stateless (HMAC-signed) session mode for SERVERLESS hosts (Vercel):
+   * function instances do not share memory, so server-side session tokens
+   * would reject logins that land on another instance. When
+   * TRIZ_SESSION_SECRET is set, the session lives inside the cookie as an
+   * HMAC-signed payload instead. It is a secret — validation names the
+   * variable and never echoes the value. */
+  const sessionSecret = options.sessionSecret !== undefined ? String(options.sessionSecret)
+    : String(env.TRIZ_SESSION_SECRET || '');
+  if (sessionSecret && /[\r\n]/.test(sessionSecret)) {
+    throw new Error('TRIZ_SESSION_SECRET must not contain line breaks (it is used as an HMAC key).');
+  }
+  if (sessionSecret && sessionSecret.length < 32) {
+    throw new Error('TRIZ_SESSION_SECRET must be at least 32 characters (generate: openssl rand -hex 32).');
+  }
+
   const hermesBaseUrl = options.hermesBaseUrl || env.HERMES_BASE_URL || 'http://127.0.0.1:9119';
   if (!options.hermesBaseUrl) readHttpUrlVar(env, 'HERMES_BASE_URL');
   const hermesPublicUrl = options.hermesPublicUrl !== undefined ? options.hermesPublicUrl
@@ -154,7 +170,7 @@ function resolveConfig(options = {}, env = process.env) {
   if (options.hermesPublicUrl === undefined) readHttpUrlVar(env, 'HERMES_PUBLIC_URL', { allowEmpty: true });
 
   const hermesTimeoutMs = options.hermesTimeoutMs !== undefined ? Number(options.hermesTimeoutMs)
-    : (readIntVar(env, 'HERMES_TIMEOUT_MS') ?? 3000);
+    : (readIntVar(env, 'HERMES_TIMEOUT_MS') ?? 8000);
   if (!Number.isInteger(hermesTimeoutMs) || hermesTimeoutMs <= 0) {
     throw new Error('HERMES_TIMEOUT_MS must be a positive integer (milliseconds).');
   }
@@ -174,8 +190,66 @@ function resolveConfig(options = {}, env = process.env) {
     throw new Error('HERMES_SESSION_TOKEN is too long (maximum 512 characters).');
   }
 
+  const root = options.root || path.resolve(__dirname, '..');
+
+  /* Where the operator's workspace→agent mapping is persisted. Default is
+   * inside the app root (data/workspaces.json); deployments may point it
+   * outside the (read-only) app tree. On Vercel the app tree is read-only
+   * and only /tmp is writable, so the default lands there (ephemeral —
+   * configure KV storage for durable mapping). Validation names the
+   * variable only. */
+  const workspacesFile = options.workspacesFile || env.TRIZ_WORKSPACES_FILE
+    || (env.VERCEL ? path.join(os.tmpdir(), 'trizempire-workspaces.json')
+      : path.join(root, 'data', 'workspaces.json'));
+  if (typeof workspacesFile !== 'string' || workspacesFile.trim() === '' || /[\0\r\n]/.test(workspacesFile)) {
+    throw new Error('TRIZ_WORKSPACES_FILE must be a non-empty file path without control characters.');
+  }
+
+  /* Optional Upstash-compatible Redis REST store for the workspace mapping
+   * (serverless hosts have a read-only filesystem). Both variable pairs
+   * seen in the wild are accepted: Vercel Marketplace injects
+   * KV_REST_API_URL / KV_REST_API_TOKEN; Upstash's own docs use
+   * UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN. When configured it
+   * takes precedence over the file store. Secrets are never echoed. */
+  const workspacesKvUrl = options.workspacesKvUrl !== undefined ? String(options.workspacesKvUrl)
+    : String(env.KV_REST_API_URL || env.UPSTASH_REDIS_REST_URL || '');
+  const workspacesKvToken = options.workspacesKvToken !== undefined ? String(options.workspacesKvToken)
+    : String(env.KV_REST_API_TOKEN || env.UPSTASH_REDIS_REST_TOKEN || '');
+  if (workspacesKvUrl) {
+    let parsedKvUrl;
+    try {
+      parsedKvUrl = new URL(workspacesKvUrl);
+    } catch {
+      parsedKvUrl = null;
+    }
+    if (!parsedKvUrl || (parsedKvUrl.protocol !== 'http:' && parsedKvUrl.protocol !== 'https:')) {
+      throw new Error('KV_REST_API_URL must be a valid http(s) URL (UPSTASH_REDIS_REST_URL is also accepted).');
+    }
+    if (parsedKvUrl.username || parsedKvUrl.password) {
+      throw new Error('KV_REST_API_URL must not contain embedded credentials.');
+    }
+  }
+  if (workspacesKvUrl && !workspacesKvToken) {
+    throw new Error('KV_REST_API_URL is set but KV_REST_API_TOKEN is empty — configure both (or the UPSTASH_REDIS_REST_* pair).');
+  }
+  if (workspacesKvToken && !workspacesKvUrl) {
+    throw new Error('KV_REST_API_TOKEN is set but KV_REST_API_URL is empty — configure both (or the UPSTASH_REDIS_REST_* pair).');
+  }
+  if (workspacesKvToken.length > 512 || /[\r\n]/.test(workspacesKvToken)) {
+    throw new Error('KV_REST_API_TOKEN must be a single line of at most 512 characters.');
+  }
+
+  /* Trust the platform's forwarded client IP for rate limiting. On Vercel
+   * (or behind any reverse proxy you control) every request arrives from an
+   * internal address, so without this the login limiter would bucket all
+   * visitors together. Off by default: a directly-exposed server must not
+   * trust client-supplied X-Forwarded-For. */
+  const trustProxy = options.trustProxy !== undefined ? options.trustProxy === true
+    : (env.TRIZ_TRUST_PROXY === 'true' || env.VERCEL === '1');
+
   return {
-    root: options.root || path.resolve(__dirname, '..'),
+    root,
+    trustProxy,
     host,
     port,
     users,
@@ -191,6 +265,11 @@ function resolveConfig(options = {}, env = process.env) {
     hermesPublicUrl,
     hermesTimeoutMs,
     hermesSessionToken,
+    workspacesFile: path.isAbsolute(workspacesFile) ? workspacesFile : path.resolve(root, workspacesFile),
+    workspacesKvUrl: workspacesKvUrl || null,
+    workspacesKvToken: workspacesKvToken || null,
+    sessionSecret: sessionSecret || null,
+    statelessSessions: sessionSecret !== '',
   };
 }
 

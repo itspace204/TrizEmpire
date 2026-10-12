@@ -31,7 +31,7 @@ npm start         # starts server.js on 127.0.0.1:57004 by default
 
 There is no build step.
 
-## Deployment bundle (systemd + nginx)
+## Deployment bundle (systemd + nginx + pm2)
 
 `deploy/` carries a committed deployment bundle for a Linux host:
 
@@ -41,6 +41,11 @@ There is no build step.
   `NODE_ENV=production`, journal logging, and sandboxing that is safe for V8's
   JIT (deliberately **no** `MemoryDenyWriteExecute=`, which would stop Node
   from starting).
+- [`deploy/ecosystem.config.js`](deploy/ecosystem.config.js) — pm2 process file,
+  the counterpart for hosts where pm2 is the house style (Hostinger VPS
+  tutorials, for example). Same HOST/PORT pins as the unit and the nginx
+  snippet. **Pick one** process manager — pm2 and systemd must not both run
+  the server.
 - [`deploy/trizempire-nginx.conf`](deploy/trizempire-nginx.conf) — nginx
   server blocks for ports 80 and 443: Let's Encrypt webroot, HTTP→HTTPS
   redirect, the Mozilla "intermediate" TLS policy (TLS 1.2 + 1.3, AEAD
@@ -68,13 +73,16 @@ sudo install -d -m 0755 /etc/trizempire
 sudoedit /etc/trizempire/trizempire.env    # TRIZ_ADMIN_PASSWORD_HASH='scrypt$…'
 sudo chmod 0600 /etc/trizempire/trizempire.env
 
-# 3. Unit
+# 3. Writable data dir for the workspace mapping (unit's ReadWritePaths=)
+sudo install -d -o trizempire -g trizempire -m 0700 /opt/trizempire/trizempire/data
+
+# 4. Unit
 sudo install -m 0644 deploy/trizempire.service /etc/systemd/system/trizempire.service
 sudo systemd-analyze verify /etc/systemd/system/trizempire.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now trizempire
 
-# 4. Verify
+# 5. Verify
 systemctl status trizempire --no-pager
 curl -fsS http://127.0.0.1:57004/healthz      # {"status":"ok"}
 journalctl -u trizempire -n 50 --no-pager     # startup banner + config errors
@@ -116,6 +124,129 @@ hostname first. `certbot --nginx` is a workable alternative, but it rewrites
 the config itself — keep the `Host` and `X-Forwarded-Proto` proxy headers if
 you merge. HSTS is included with a two-year `max-age`; leave it commented out
 on a first rollout until HTTPS is verified, and do not add `preload`.
+
+## Vercel (serverless)
+
+The repo deploys to Vercel as a **single serverless function**: the same
+`createServer()` pipeline (headers, auth, CSRF, proxy, static delivery) that
+`npm start` runs, dispatched per request by [`api/index.js`](api/index.js)
+instead of listening on a port. [`vercel.json`](vercel.json) rewrites every
+path to that function and bundles the runtime-read static files
+(`trizempire/index.html`, `crew/`, `vendor/`) into it with `includeFiles` —
+without that, Node File Trace cannot see dynamically assembled paths and the
+UI would 404.
+
+```sh
+# one-time, from your machine:
+node trizempire/scripts/hash-password.js   # prints scrypt$…
+openssl rand -hex 32                       # stateless session secret
+vercel link                                # attach the repo to a Vercel project
+vercel env add TRIZ_ADMIN_PASSWORD_HASH production
+vercel env add TRIZ_SESSION_SECRET production
+vercel --prod
+```
+
+Environment the platform expects (Project → Settings → Environment
+Variables):
+
+| Variable | Value |
+| --- | --- |
+| `TRIZ_ADMIN_PASSWORD_HASH` | **Required.** `NODE_ENV=production` is set by Vercel, so the server refuses to start without it — there is no default password. |
+| `TRIZ_SESSION_SECRET` | **Required.** Instances share no memory, so sessions must be stateless (HMAC-signed cookies). Generate with `openssl rand -hex 32`. Read the trade-offs in the variable table: no idle timeout, no revocation before the absolute expiry. |
+| `KV_REST_API_URL` + `KV_REST_API_TOKEN` | **Recommended.** Install "Upstash Redis" from the Vercel Marketplace (has a free tier) so the workspace→agent mapping survives deploys. Without it the mapping falls back to `/tmp`, which is wiped on every deploy. |
+| `HERMES_BASE_URL` | Your Hermes dashboard's **publicly reachable** URL — see the honest limitation below. |
+| `HERMES_PUBLIC_URL` | Leave **unset**: visitors' browsers cannot reach your machine's loopback, so the embedded console stays off (the UI says so). |
+
+Honest limitations of the serverless target — the UI reports all of them
+rather than pretending:
+
+- **Hermes telemetry depends on reaching your machine.** The proxy fetches
+  server-side; `127.0.0.1:9119` does not exist on Vercel. Either accept that
+  the cockpit shows the gateway as offline, or expose Hermes over HTTPS
+  yourself (an authenticated reverse proxy, or a tunnel such as Cloudflare
+  Tunnel) and set `HERMES_BASE_URL` to it. The upstream path allowlist still
+  applies — only `/api/status` and the token-gated `/api/profiles*` are ever
+  requested.
+- **Sessions and rate limits are per-instance.** Stateful sessions are
+  impossible (hence `TRIZ_SESSION_SECRET`); the login limiter buckets by
+  forwarded IP (`VERCEL=1` enables trust-proxy automatically) but is not
+  shared between instances — a determined attacker can get more than five
+  attempts by hitting different instances. Treat Vercel's own WAF/rate
+  limits as the outer layer.
+- **Workspace mapping needs KV to be durable** (`/tmp` is per-deploy).
+- **Node 20 is disabled for new Vercel functions** (since October 2026);
+  the root `package.json` pins `>=22`, and the app itself still runs on 20+
+  for self-hosted deployments.
+
+Local verification of the serverless entry (no Vercel account needed):
+
+```sh
+node -e "const h=require('./api/index.js'),s=require('node:http').createServer(h);s.listen(57099,'127.0.0.1',()=>console.log('http://127.0.0.1:57099'))"
+```
+
+## Hostinger
+
+Hostinger does not run bare `node server.js` for you; pick the target that
+matches your plan.
+
+### VPS (KVM, full root — the recommended path)
+
+Same bundle as any Linux host, with pm2 instead of systemd if you prefer
+Hostinger's house style:
+
+```sh
+# 1. Create the app user and clone (as root, then work unprivileged)
+useradd --system --home /opt/trizempire --shell /usr/sbin/nologin trizempire
+git clone https://github.com/itspace204/TrizEmpire.git /opt/trizempire
+
+# 2. Node.js 20+ (Nodesource or nvm), then verify: node -v
+
+# 3. Secrets — the server loads trizempire/.env itself (chmod 0600)
+cd /opt/trizempire/trizempire
+node scripts/hash-password.js > /tmp/h.txt   # type the admin password
+# create .env with TRIZ_ADMIN_PASSWORD_HASH from /tmp/h.txt
+rm /tmp/h.txt
+
+# 4. Process manager — pick ONE:
+#    pm2 (Hostinger tutorials use this):
+npm install -g pm2
+pm2 start /opt/trizempire/deploy/ecosystem.config.js
+pm2 save && pm2 startup      # auto-start on boot
+#    …or the systemd unit: see "Install the service" above.
+
+# 5. Writable data dir (systemd sandbox only)
+install -d -o trizempire -g trizempire -m 0700 /opt/trizempire/trizempire/data
+
+# 6. TLS reverse proxy: deploy/trizempire-nginx.conf unchanged
+#    (nginx + certbot: `apt install nginx certbot python3-certbot-nginx`)
+
+# 7. hPanel → VPS → Security → Firewall: if a firewall policy group is
+#    active it defaults to DROP — allow your SSH port, 80 and 443.
+```
+
+The cheapest KVM plan (1 vCPU / 4 GB RAM) runs this comfortably; it is a
+single zero-dependency process with no database.
+
+### Managed Node.js Web Apps (eligible shared/cloud plans)
+
+Hostinger's dashboard flow (Websites → Create Website → Web App) deploys
+from GitHub or ZIP. Point it at this repo with:
+
+- **Project root:** `trizempire/`
+- **Start command:** `node server.js`
+- **Node version:** 20 or later
+
+Set the same environment variables as any production host
+(`TRIZ_ADMIN_PASSWORD_HASH` is mandatory). Their managed proxy terminates
+TLS; make sure it forwards `Host` (the CSRF check compares `Origin` against
+it) — their Node.js proxy presets do.
+
+### What does NOT work
+
+- **Legacy cPanel shared hosting**: it cannot run a long-lived Node process;
+  static-only output would lose the API, auth and proxy entirely.
+- **Hostinger Horizons / AI Builder sites**: exported as static websites —
+  same problem.
 
 ## Environment variables
 
@@ -161,11 +292,15 @@ name — never the value — when:
 | `TRIZ_OPERATOR_PASSWORD_HASH` | unset | scrypt hash for the `operator` account (role `operator`). |
 | `TRIZ_SESSION_TTL_MINUTES` | `480` | Session idle timeout. |
 | `TRIZ_SESSION_ABS_MINUTES` | `1440` | Session absolute lifetime. |
+| `TRIZ_SESSION_SECRET` | unset | Enables **stateless HMAC-signed sessions** (required on serverless hosts such as Vercel, where function instances share no memory). Sessions then live inside the cookie: the idle timeout is **not** tracked (only the absolute lifetime — keep it short), and a cookie cannot be revoked before expiry (rotating the secret signs everyone out). Generate with `openssl rand -hex 32`. |
 | `TRIZ_SECURE_COOKIE` | unset | `true` forces `Secure` cookies without full production mode. |
 | `HERMES_BASE_URL` | `http://127.0.0.1:9119` | Server-side upstream for live status. Only the fixed `/api/status` path is ever fetched — it can never become an open proxy. No credentials in the URL. |
 | `HERMES_PUBLIC_URL` | `http://127.0.0.1:9119` | URL handed to browsers for the **local-only** embedded console. Set to empty (`HERMES_PUBLIC_URL=`) on remote deployments. No credentials in the URL. |
-| `HERMES_TIMEOUT_MS` | `3000` | Per-attempt upstream timeout (one retry on network errors). |
+| `HERMES_TIMEOUT_MS` | `8000` | Per-attempt upstream timeout (one retry on network errors). Sized for the per-profile aggregation endpoints, which take seconds while the messaging gateway is running. |
 | `HERMES_SESSION_TOKEN` | unset | Upstream session token for the authenticated per-agent endpoints (`/api/profiles*`). Sent as `X-Hermes-Session-Token`, only to the fixed allowlisted upstream paths, never to browsers. Empty = per-agent crew data disabled (the endpoint reports `unconfigured` and the UI keeps global signals). |
+| `TRIZ_WORKSPACES_FILE` | `data/workspaces.json` (under the app directory; `/tmp` on Vercel) | Where the operator's workspace→agent mapping (saved from the cockpit's ＋ ASSIGN panel) is persisted. Relative paths resolve against the app directory. On systemd the app tree is read-only (`ProtectSystem=strict`); the unit's `ReadWritePaths=` opens the default `data/` directory — create it owned by the service user before first start. |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | unset | Upstash-compatible Redis REST store for the workspace mapping — **required for durable mapping on serverless hosts** (the lambda filesystem is read-only). The `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` pair works too. Both halves must be set together; when configured, KV takes precedence over the file store. |
+| `TRIZ_TRUST_PROXY` | unset (`true` automatically when `VERCEL=1`) | Trust `X-Real-IP`/`X-Forwarded-For` for rate-limit bucketing. Enable only behind a reverse proxy **you** control — on a directly-exposed server it lets clients spoof their IP. |
 
 ### Creating password hashes
 
@@ -335,9 +470,13 @@ GET /api/hermes/messaging?profile=NAME  → Hermes /api/messaging/platforms?prof
   responses, authentication and rate limiting in front.
 - The proxy stays **read-only**: starting or stopping a profile's messaging
   gateway happens inside the Hermes console, never through TrizEmpire.
-- Workspace→profile membership lives in `trizempire/crew/crew-model.js`
-  (`WORKSPACES`); a profile outside that table simply has no card and stays
-  reachable through the Crew view.
+- Workspace→profile membership ships as defaults in `trizempire/crew/crew-model.js`
+  (`WORKSPACES` — Client starts empty) and is **operator-overridable**: the
+  cockpit's ＋ ASSIGN panel PUTs the mapping to `/api/workspaces`, which
+  validates it (known workspace ids, one home per profile) and persists it to
+  `TRIZ_WORKSPACES_FILE`. A corrupt or invalid stored file is reported by
+  `GET /api/workspaces` and the shipped defaults apply instead. A profile in
+  no workspace simply has no card and stays reachable through the Crew view.
 
 ## Logging and health checks
 
@@ -352,9 +491,13 @@ GET /api/hermes/messaging?profile=NAME  → Hermes /api/messaging/platforms?prof
 
 - The app has **no database**. Sessions and rate-limit state are in-memory and
   reset on restart (users simply sign in again).
+- The only file the server writes is the workspace→agent mapping
+  (`TRIZ_WORKSPACES_FILE`, default `data/workspaces.json` — profile names
+  only, no secrets). Include it in backups if you want to keep an operator's
+  assignment across rebuilds; losing it just restores the shipped defaults.
 - Recovery = redeploy the repository at the desired revision and restart.
 - Back up your environment configuration (hashed passwords, URLs) in your
-  secret manager — it is the only persistent state.
+  secret manager — it is the only other persistent state.
 
 ## Rollback
 
@@ -398,8 +541,9 @@ to `main` and every pull request.
   scrypt+session authentication, CSRF, login rate limiting (in-memory),
   server-side Hermes status proxy with normalized states, health endpoints,
   startup environment validation with secret-safe errors, the full UI
-  (cockpit, crew command center, 3D Agent City, local console embed), 63
-  automated tests including the deployment-bundle checks and a real-Hermes
+  (cockpit, crew command center, 3D Agent City, local console embed), 119
+  automated tests including the deployment-bundle checks (systemd, nginx,
+  pm2), the Vercel serverless entry/config checks and a real-Hermes
   integration test that skips when Hermes is not running.
 - **Partially implemented:** per-agent working/idle coloring uses real
   per-profile session data **when** `HERMES_SESSION_TOKEN` is configured (see
@@ -408,9 +552,12 @@ to `main` and every pull request.
   cookie logins — the UI falls back to the global backend signals
   (`gateway_running`, `active_agents`) and says so. Rate limiting and
   sessions are per-process (not shared across replicas).
-  The systemd unit and nginx snippet are committed as a bundle but are
-  validated structurally by tests, not by `systemd-analyze verify`/`nginx -t`
-  in CI — run both on the target host as shown above.
+  The systemd unit, pm2 file and nginx snippet are committed as a bundle but
+  are validated structurally by tests, not by `systemd-analyze
+  verify`/`nginx -t` in CI — run both on the target host as shown above.
+  On Vercel, login rate limiting and sessions are per-instance (see
+  [Vercel (serverless)](#vercel-serverless)); Hermes telemetry needs a
+  publicly reachable `HERMES_BASE_URL`.
 - **Planned / blocked:** persistent
   audit storage, multi-user administration UI, real per-agent activity data
   (needs authenticated Hermes access), and the placeholder nav modules

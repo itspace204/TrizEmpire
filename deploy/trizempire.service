@@ -55,8 +55,13 @@ StandardOutput=journal
 StandardError=journal
 UMask=0077
 
-# Sandboxing: the server writes nothing to disk (no database; logs go to the
-# journal), so the filesystem can be locked down completely.
+# Sandboxing: the server's only disk write is the operator's workspace
+# assignment mapping (TRIZ_WORKSPACES_FILE, default data/workspaces.json
+# under WorkingDirectory) — logs go to the journal. ProtectSystem=strict
+# makes the app tree read-only, so that one directory is opened explicitly
+# below; create it owned by the service user before first start:
+#   install -d -o trizempire -g trizempire -m 0700 /opt/trizempire/trizempire/data
+ReadWritePaths=/opt/trizempire/trizempire/data
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

@@ -16,11 +16,12 @@ const path = require('node:path');
 
 const { applySecurityHeaders } = require('./lib/security');
 const {
-  verifyCredentials, SessionStore, RateLimiter,
+  verifyCredentials, SessionStore, StatelessSessionStore, RateLimiter,
   parseCookies, sessionCookie, clearedCookie, isSameOrigin, hasCsrfHeader,
 } = require('./lib/auth');
 const { loadEnvFile, resolveConfig } = require('./lib/config');
 const hermesProxy = require('./lib/hermes');
+const workspacesLib = require('./lib/workspaces');
 
 const DEFAULT_ROOT = __dirname;
 const SESSION_COOKIE = 'triz_session';
@@ -85,18 +86,34 @@ function readJsonBody(req, maxBytes = 4096) {
   });
 }
 
-function clientKey(req) {
+/* Client identity for rate limiting. Behind a trusted proxy (Vercel, or
+   TRIZ_TRUST_PROXY=true) the real client is the first forwarded hop; on a
+   directly-exposed server the socket address is the only trustworthy key. */
+function clientKey(req, cfg) {
+  if (cfg && cfg.trustProxy) {
+    const realIp = String(req.headers['x-real-ip'] || '').trim()
+      || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    if (realIp) return realIp;
+  }
   return req.socket.remoteAddress || 'unknown';
 }
 
 function resolveOptions(options = {}, env = process.env) {
   const cfg = resolveConfig(options, env);
-  cfg.sessions = options.sessions || new SessionStore({
-    idleMs: cfg.sessionIdleMs,
-    absoluteMs: cfg.sessionAbsoluteMs,
-  });
+  /* Stateless HMAC-signed sessions when TRIZ_SESSION_SECRET is set —
+     required on serverless hosts (Vercel), where instances share no memory. */
+  cfg.sessions = options.sessions || (cfg.statelessSessions
+    ? new StatelessSessionStore({ secret: cfg.sessionSecret, absoluteMs: cfg.sessionAbsoluteMs })
+    : new SessionStore({ idleMs: cfg.sessionIdleMs, absoluteMs: cfg.sessionAbsoluteMs }));
   cfg.loginLimiter = options.loginLimiter || new RateLimiter({ max: 5, windowMs: 15 * 60 * 1000 });
   cfg.statusLimiter = options.statusLimiter || new RateLimiter({ max: 120, windowMs: 60 * 1000 });
+  /* Workspace mapping store: Upstash-compatible KV when configured
+     (serverless hosts), else the local JSON file. */
+  cfg.workspacesStore = options.workspacesStore || workspacesLib.createStore({
+    file: cfg.workspacesFile,
+    kv: (cfg.workspacesKvUrl && cfg.workspacesKvToken)      ? { url: cfg.workspacesKvUrl, token: cfg.workspacesKvToken }
+      : null,
+  });
   delete cfg.sessionIdleMs;
   delete cfg.sessionAbsoluteMs;
   return cfg;
@@ -177,7 +194,7 @@ function createServer(options = {}) {
       if (!isSameOrigin(req)) {
         return sendJson(res, 403, { error: 'cross_origin_rejected' });
       }
-      const key = clientKey(req);
+      const key = clientKey(req, cfg);
       const limit = cfg.loginLimiter.check(key);
       if (!limit.allowed) {
         res.setHeader('Retry-After', String(limit.retryAfterSeconds));
@@ -237,7 +254,7 @@ function createServer(options = {}) {
       }
       const gate = requireAuth(req, res);
       if (!gate.ok) return;
-      const key = clientKey(req);
+      const key = clientKey(req, cfg);
       const limit = cfg.statusLimiter.check(key);
       if (!limit.allowed) {
         res.setHeader('Retry-After', String(limit.retryAfterSeconds));
@@ -267,7 +284,7 @@ function createServer(options = {}) {
       }
       const gate = requireAuth(req, res);
       if (!gate.ok) return;
-      const key = clientKey(req);
+      const key = clientKey(req, cfg);
       const limit = cfg.statusLimiter.check(key);
       if (!limit.allowed) {
         res.setHeader('Retry-After', String(limit.retryAfterSeconds));
@@ -286,6 +303,45 @@ function createServer(options = {}) {
               : result.state === 'error' ? 504 : 502;
         return sendJson(res, status, result);
       });
+    }
+
+    /* ── workspace→agent mapping (operator-owned, persisted on the server).
+       GET returns the stored mapping (or the shipped defaults when none is
+       stored). PUT validates against the shared crew model — known workspace
+       ids only, one home per profile — and persists atomically. Writing is
+       an authenticated, CSRF-checked mutation; reading carries no upstream
+       traffic at all. ── */
+    if (pathname === '/api/workspaces') {
+      if (method !== 'GET' && method !== 'HEAD' && method !== 'PUT') {
+        res.setHeader('Allow', 'GET, HEAD, PUT');
+        return send(res, 405, 'Method not allowed', undefined, method);
+      }
+      const gate = requireAuth(req, res);
+      if (!gate.ok) return;
+      if (method === 'PUT') {
+        if (!requireCsrf(req, res)) return;
+        return readJsonBody(req)
+          .then(body => cfg.workspacesStore.save(body && body.assignments))
+          .then(saved => {
+            if (!saved.ok) {
+              return sendJson(res, 400, { ok: false, error: saved.error }, method);
+            }
+            console.log(`workspaces saved backend=${cfg.workspacesStore.backend} count=${Object.keys(saved.assignments).length}`);
+            return sendJson(res, 200, { ok: true, assignments: saved.assignments, source: 'stored', backend: cfg.workspacesStore.backend }, method);
+          })
+          .catch(err => {
+            if (res.headersSent) return;
+            const status = String(err.message) === 'body_too_large' ? 413 : 400;
+            return sendJson(res, status, { ok: false, error: String(err.message) || 'bad_request' }, method);
+          });
+      }
+      return cfg.workspacesStore.load().then(loaded => sendJson(res, 200, {
+        ok: true,
+        assignments: loaded.assignments,
+        source: loaded.source,
+        error: loaded.error,
+        backend: cfg.workspacesStore.backend,
+      }, method));
     }
 
     /* ── authorized diagnostics (no paths, env values or tokens) ── */
@@ -342,6 +398,15 @@ function createServer(options = {}) {
         res.statusCode = 200;
         res.setHeader('Content-Type', type);
         res.setHeader('Content-Length', stat.size);
+        /* Cache policy for static delivery (overriding the global no-store):
+           - /vendor/ is pinned third-party code that only changes on upgrade
+           - /crew/ is versioned app logic (hours, not days, is the risk)
+           - index.html stays no-store so a redeploy is picked up immediately */
+        if (firstSegment === 'vendor') {
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+        } else if (firstSegment === 'crew') {
+          res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+        }
         if (method === 'HEAD') return res.end();
         const stream = fs.createReadStream(realPath);
         stream.on('error', () => {

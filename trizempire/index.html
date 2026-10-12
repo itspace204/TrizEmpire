@@ -344,6 +344,21 @@ body{
 .wsx-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .wsx-hint{font-family:var(--mono);font-size:9.5px;color:var(--muted);letter-spacing:.08em;background:#241811;border-radius:9px;padding:10px 12px;margin-top:10px;overflow-wrap:anywhere;line-height:1.7}
 .wsx-loading{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--muted);padding:26px 14px;text-align:center}
+.wsx-assign{background:#181008;border:1px solid #2a1c10;border-radius:16px;padding:18px 20px}
+.wsx-assign-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.wsx-assign-head h5{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--orange);margin:0}
+.wsx-assign-head .sub{font-size:11.5px;color:var(--muted);line-height:1.6}
+.wsx-assign-list{display:flex;gap:9px;flex-wrap:wrap}
+.wsx-pick{display:flex;align-items:center;gap:9px;background:#241811;border:1px solid #3a2c22;border-radius:12px;padding:8px 14px 8px 8px;cursor:pointer;transition:border-color .15s,background .15s;font:inherit;color:inherit;text-align:left}
+.wsx-pick:hover{border-color:#ff7a35}
+.wsx-pick:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.wsx-pick.on{border-color:var(--orange);background:#221509;box-shadow:0 6px 18px rgba(255,106,26,.14)}
+.wsx-pick img{width:34px;height:34px;border-radius:50%;border:2px solid var(--ring,#ff6a1a);background:#0d0906;flex:0 0 auto}
+.wsx-pick .pn{display:block;font-size:12.5px;color:var(--cream);font-weight:600;line-height:1.15;white-space:nowrap}
+.wsx-pick .ph{display:block;font-family:var(--mono);font-size:8px;letter-spacing:.14em;color:var(--muted);margin-top:3px;white-space:nowrap}
+.wsx-assign-btns{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.wsx-assign-status{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--muted)}
+.wsx-assign-status.bad{color:#ff6a6a}
 
 /* ───────── Agent City ───────── */
 /* ───────── Crew — command center (sidebar · orbital stage · derived roster) ───────── */
@@ -651,8 +666,21 @@ body{
             <span class="wsx-title" id="wsx-title">—</span>
             <span class="wsx-iso"><span class="bx">▤</span>ISOLATED WORKSPACE</span>
             <button class="wsx-refresh" id="wsx-refresh" title="Refetch this agent's facts from the backend">↻ REFRESH</button>
+            <button class="wsx-refresh" id="wsx-assign" title="Assign agents to this workspace (saved on the server)" aria-expanded="false" aria-controls="wsx-assign-panel">＋ ASSIGN</button>
           </div>
           <div class="wsx-agents" id="wsx-agents" role="group" aria-label="Agents in this workspace"></div>
+          <div class="wsx-assign" id="wsx-assign-panel" hidden>
+            <div class="wsx-assign-head">
+              <h5>ASSIGN AGENTS</h5>
+              <span class="sub">One home per agent — assigning here moves it out of its current workspace. Saved on the server, survives reloads and restarts.</span>
+            </div>
+            <div class="wsx-assign-list" id="wsx-assign-list" role="group" aria-label="Assign agents to this workspace"></div>
+            <div class="wsx-assign-btns">
+              <button class="wsx-btn" id="wsx-assign-save" title="Persist this workspace mapping on the server">SAVE MAPPING</button>
+              <button class="wsx-btn" id="wsx-assign-cancel" title="Discard changes">CANCEL</button>
+              <span class="wsx-assign-status" id="wsx-assign-status" role="status"></span>
+            </div>
+          </div>
           <div class="wsx-grid" id="wsx-detail">
             <div class="wsx-panel" id="wsx-section-memory">
               <h4>OWN MEMORY</h4>
@@ -789,6 +817,13 @@ let selectedAgentId = CREW.length ? CREW[0].profile : null;
 let crewStatuses = {};                 // profile -> honest state key
 let crewFacts = null;                  // per-agent facts from /api/hermes/agents (null = unavailable)
 let crewQuery = '';
+/* Effective workspace→agent mapping: the model's shipped defaults, overlaid
+   with the operator's overrides persisted by the server (GET /api/workspaces).
+   Declared here — before any render — so the first paint already uses it.
+   (Named WS_LIST, not WORKSPACES: the loaded crew model already owns a
+   global WORKSPACES binding — a second `let` in the same scope is a
+   SyntaxError that would kill the whole script.) */
+let WS_LIST = MODEL.WORKSPACES;
 const CREW_MSG = {
   working: 'Running — counted active by the gateway.',
   ready:   'Gateway up · standing by.',
@@ -981,7 +1016,7 @@ const WSX_DETAIL_TEMPLATE = document.getElementById('wsx-detail').innerHTML;
 function renderWorkspaces(){
   const grid = document.getElementById('ws-grid');
   if(!grid) return;
-  grid.innerHTML = MODEL.WORKSPACES.map(ws=>{
+  grid.innerHTML = WS_LIST.map(ws=>{
     const agents = MODEL.agentsInWorkspace(ws, CREW);
     const avatars = agents.length
       ? agents.map(a=>{
@@ -1037,7 +1072,7 @@ function closeWorkspace(){
 }
 
 function openWorkspace(wsId, focusProfile, jumpSection){
-  const ws = MODEL.WORKSPACES.find(w=>w.id===wsId);
+  const ws = WS_LIST.find(w=>w.id===wsId);
   if(!ws) return;
   currentWs = ws;
   showWorkspaceView();
@@ -1050,7 +1085,7 @@ function openWorkspace(wsId, focusProfile, jumpSection){
   detail.innerHTML = WSX_DETAIL_TEMPLATE;
   if(!wsxFocus){
     document.getElementById('wsx-agents').innerHTML = '';
-    detail.innerHTML = `<div class="wsx-empty">NO AGENTS ASSIGNED TO ${esc(ws.name)} YET.<br>Membership lives in the shared crew model — assign a profile to this workspace and it appears here.</div>`;
+    detail.innerHTML = `<div class="wsx-empty">NO AGENTS ASSIGNED TO ${esc(ws.name)} YET.<br>Use ＋ ASSIGN above to give this workspace a crew member — the mapping is saved on the server.</div>`;
     return;
   }
   renderWsxAgents(agents);
@@ -1103,6 +1138,135 @@ document.getElementById('wsx-agents').addEventListener('click', e=>{
 
 document.getElementById('wsx-back').addEventListener('click', closeWorkspace);
 document.getElementById('wsx-refresh').addEventListener('click', ()=>{ if(wsxFocus) loadAgentFacts(wsxFocus); });
+
+/* ════ Workspace assignment (operator-owned mapping, persisted on the server) ════
+   The cards ship with honest defaults (Client empty). ＋ ASSIGN lets the
+   operator give any workspace its crew members; SAVE MAPPING PUTs the whole
+   map to /api/workspaces, which validates it (known workspaces, one home per
+   profile) and persists it. Nothing here invents agents — the picks are the
+   REAL crew list, and a failed save says so instead of pretending. */
+const wsxAssignBtn = document.getElementById('wsx-assign');
+const wsxAssignPanel = document.getElementById('wsx-assign-panel');
+const wsxAssignStatus = document.getElementById('wsx-assign-status');
+let wsxPending = null;                 // Set of profiles staged for currentWs
+
+function wsxAssignOpen(){
+  if(!currentWs) return;
+  wsxPending = new Set(currentWs.profiles);
+  wsxAssignPanel.hidden = false;
+  wsxAssignBtn.setAttribute('aria-expanded', 'true');
+  wsxAssignStatus.textContent = '';
+  wsxAssignStatus.classList.remove('bad');
+  renderWsxPicks();
+}
+function wsxAssignClose(){
+  wsxPending = null;
+  wsxAssignPanel.hidden = true;
+  wsxAssignBtn.setAttribute('aria-expanded', 'false');
+}
+function renderWsxPicks(){
+  const el = document.getElementById('wsx-assign-list');
+  if(!el || !wsxPending || !currentWs) return;
+  el.innerHTML = CREW.map(c=>{
+    const on = wsxPending.has(c.profile);
+    const elsewhere = WS_LIST.find(w=>w.id!==currentWs.id && w.profiles.includes(c.profile));
+    const hint = on ? 'IN ' + currentWs.name.toUpperCase()
+      : elsewhere ? 'IN ' + elsewhere.name.toUpperCase() + ' — CLICK TO MOVE HERE'
+        : 'UNASSIGNED — CLICK TO ASSIGN';
+    return `<button class="wsx-pick ${on?'on':''}" data-profile="${esc(c.profile)}" aria-pressed="${on}"
+        style="--ring:${esc(c.ring || '#ff6a1a')}"
+        title="${on ? 'Remove from ' + esc(currentWs.name) : 'Assign to ' + esc(currentWs.name)}">
+        <img src="${avatarFor(c.profile)}" alt="" />
+        <span><span class="pn">${esc(c.name)}</span><span class="ph">${esc(hint)}</span></span>
+      </button>`;
+  }).join('');
+}wsxAssignBtn.addEventListener('click', ()=>{
+  if(wsxAssignPanel.hidden){ wsxAssignOpen(); }
+  else { wsxAssignClose(); }
+});
+document.getElementById('wsx-assign-cancel').addEventListener('click', wsxAssignClose);
+document.getElementById('wsx-assign-list').addEventListener('click', e=>{
+  const pick = e.target.closest('.wsx-pick[data-profile]');
+  if(!pick || !wsxPending) return;
+  const p = pick.dataset.profile;
+  if(wsxPending.has(p)) wsxPending.delete(p);
+  else wsxPending.add(p);
+  renderWsxPicks();
+});
+
+/* One home per profile: the staged map drops the profile from every OTHER
+   workspace before adding it here, so the server never even sees a
+   duplicate. The whole map travels (not a delta) so the persisted file is
+   always complete and auditable. */
+function wsxBuildMap(){
+  const map = {};
+  WS_LIST.forEach(ws=>{
+    map[ws.id] = ws.id === currentWs.id
+      ? [...wsxPending]
+      : ws.profiles.filter(p=>!wsxPending.has(p));
+  });
+  return map;
+}
+
+document.getElementById('wsx-assign-save').addEventListener('click', async ()=>{
+  if(!wsxPending || !currentWs) return;
+  const map = wsxBuildMap();
+  wsxAssignStatus.classList.remove('bad');
+  wsxAssignStatus.textContent = 'SAVING…';
+  try{
+    const r = await fetch('/api/workspaces', {
+      method:'PUT',
+      headers:{'content-type':'application/json', 'x-triz-csrf':'1'},
+      body: JSON.stringify({assignments: map}),
+    });
+    if(r.status === 401){ showLogin(); return; }
+    const b = await r.json().catch(()=>({}));
+    if(!r.ok || b.ok !== true){
+      wsxAssignStatus.classList.add('bad');
+      wsxAssignStatus.textContent = 'SAVE FAILED — ' + (b.error ? String(b.error).toUpperCase() : 'THE SERVER REFUSED THE MAPPING');
+      return;
+    }
+    applyWorkspaces(b.assignments);
+    wsxAssignClose();
+  }catch{
+    wsxAssignStatus.classList.add('bad');
+    wsxAssignStatus.textContent = 'SAVE FAILED — CANNOT REACH THE TRIZEMPIRE SERVER.';
+  }
+});
+
+/* Apply a server-persisted mapping (or fall back to defaults) and refresh
+   every view that reads workspace membership. */
+function applyWorkspaces(assignments){
+  WS_LIST = MODEL.withAssignments(MODEL.WORKSPACES, assignments);
+  renderWorkspaces();
+  if(currentWs){
+    const still = WS_LIST.find(w=>w.id===currentWs.id);
+    if(still){
+      currentWs = still;
+      if(wsxPending) wsxPending = new Set(still.profiles);
+      openWorkspace(still.id, wsxFocus, null);
+      if(!wsxAssignPanel.hidden) renderWsxPicks();
+    } else {
+      closeWorkspace();
+    }
+  }
+}
+
+async function loadWorkspaces(){
+  try{
+    const r = await fetch('/api/workspaces', {cache:'no-store'});
+    if(r.status === 401){ showLogin(); return; }
+    const b = await r.json().catch(()=>({}));
+    if(r.ok && b.ok === true){
+      applyWorkspaces(b.assignments);
+      if(b.error){
+        /* Honest surfacing: a corrupt stored file still yields the defaults,
+           but the operator should know the saved mapping was skipped. */
+        console.warn('workspaces:', b.error);
+      }
+    }
+  }catch{ /* server unreachable: the defaults already rendered stay */ }
+}
 
 function fmtBytes(n){
   const v = Number(n) || 0;
@@ -1535,6 +1699,7 @@ document.getElementById('user-chip').addEventListener('click', async ()=>{
 
 function startLive(){
   loadHermes();
+  loadWorkspaces();                       /* operator's workspace mapping */
   setInterval(loadHermes, 15000);   /* refresh live state every 15s */
 }
 

@@ -115,6 +115,65 @@ class SessionStore {
   }
 }
 
+/* ── stateless (HMAC-signed) sessions for serverless hosts ────────────────
+ * On serverless platforms (Vercel and friends) every function instance has
+ * its own memory, so a server-side token map can reject a valid login as
+ * soon as the next request lands on another instance. This store keeps the
+ * SAME interface but carries the session inside the cookie as
+ * base64url(JSON).HMAC-SHA256 — verifiable anywhere with the shared secret.
+ * Trade-offs (honest, by design):
+ *   - idle expiry is NOT tracked (nothing shared to track it on): only the
+ *     absolute lifetime is enforced — keep TRIZ_SESSION_ABS_MINUTES short;
+ *   - there is NO revocation before expiry: destroy() is a no-op. Rotating
+ *     TRIZ_SESSION_SECRET cuts every session off at once.
+ * Tampering is caught by a timing-safe HMAC comparison; a forged cookie is
+ * rejected exactly like a wrong server-side token. */
+class StatelessSessionStore {
+  constructor({ secret, absoluteMs = 24 * 60 * 60 * 1000, now = Date.now } = {}) {
+    if (typeof secret !== 'string' || secret.length < 32) {
+      throw new Error('StatelessSessionStore requires a secret of at least 32 characters');
+    }
+    this.secret = secret;
+    this.absoluteMs = absoluteMs;
+    this.now = now;
+  }
+
+  sign(payload) {
+    return crypto.createHmac('sha256', this.secret).update(payload).digest('base64url');
+  }
+
+  create(user, role) {
+    const t = this.now();
+    const payload = Buffer.from(JSON.stringify({ u: user, r: role, c: t })).toString('base64url');
+    return `${payload}.${this.sign(payload)}`;
+  }
+
+  /* Returns { user, role, created } for a valid, unexpired cookie, else null. */
+  get(token) {
+    if (typeof token !== 'string') return null;
+    const dot = token.lastIndexOf('.');
+    if (dot <= 0) return null;
+    const payload = token.slice(0, dot);
+    const mac = Buffer.from(token.slice(dot + 1));
+    const expected = Buffer.from(this.sign(payload));
+    if (mac.length !== expected.length || !crypto.timingSafeEqual(mac, expected)) return null;
+    let claims;
+    try {
+      claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    } catch {
+      return null;
+    }
+    if (!claims || typeof claims.u !== 'string' || typeof claims.r !== 'string' || !Number.isFinite(claims.c)) {
+      return null;
+    }
+    if (this.now() - claims.c > this.absoluteMs) return null;
+    return { user: claims.u, role: claims.r, created: claims.c, lastSeen: claims.c };
+  }
+
+  /* Cannot revoke a signed cookie before expiry — see the trade-offs above. */
+  destroy() {}
+}
+
 /* ── login rate limiter (per client key, e.g. IP) ─────────────────────── */
 
 class RateLimiter {
@@ -209,6 +268,7 @@ module.exports = {
   usersFromEnv,
   verifyCredentials,
   SessionStore,
+  StatelessSessionStore,
   RateLimiter,
   parseCookies,
   sessionCookie,

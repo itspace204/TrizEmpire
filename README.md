@@ -15,7 +15,9 @@ TrizEmpire is a Node.js operator interface for a local [Hermes](https://github.c
 - `trizempire/scripts/` — `hash-password.js` (create password hashes), `check-syntax.js` (cross-platform syntax check).
 - `trizempire/tests/` — automated test suite (`node:test`, no dependencies).
 - `.github/workflows/trizempire-checks.yml` — Gitleaks + syntax + tests on Node 20/22/24.
-- `deploy/` — committed deployment bundle for a Linux host: hardened systemd unit (`trizempire.service`) and nginx TLS snippet (`trizempire-nginx.conf`).- `DEPLOYMENT.md` — production deployment guide.
+- `deploy/` — committed deployment bundle for a Linux host: hardened systemd unit (`trizempire.service`), pm2 process file (`ecosystem.config.js`, used by Hostinger VPS-style hosts) and nginx TLS snippet (`trizempire-nginx.conf`).
+- `api/index.js` + `vercel.json` — Vercel serverless entry: the same server pipeline dispatched per request, with the static UI bundled via `includeFiles`.
+- `DEPLOYMENT.md` — production deployment guide (Linux host, Hostinger, Vercel).
 
 ## Requirements
 
@@ -54,10 +56,12 @@ Sign in as `admin` with the password you hashed. Optionally set `TRIZ_OPERATOR_P
 ```sh
 cd trizempire
 npm run check     # syntax check across the project
-npm test          # 63 tests: server, auth, sessions, CSRF, rate limiting,
-                  # proxy states, traversal/symlink protection, headers,
-                  # environment-config validation and .env hygiene,
-                  # deployment-bundle (systemd unit + nginx TLS) checks,
+npm test          # 119 tests: server, auth, sessions (server-side and
+                  # stateless/signed), CSRF, rate limiting, proxy states,
+                  # traversal/symlink protection, headers, environment-config
+                  # validation and .env hygiene, workspace-mapping store
+                  # (file + Upstash REST), deployment bundle (systemd unit,
+                  # pm2 file, nginx TLS), the Vercel serverless entry/config,
                   # plus a real-Hermes integration test (skips if Hermes is down)
 ```
 
@@ -71,6 +75,8 @@ All via environment variables — template in [trizempire/.env.example](trizempi
 - `HERMES_SESSION_TOKEN` — upstream session token that unlocks real per-agent crew states (per-profile sessions from Hermes) and the cockpit workspace panels (each agent's own memory providers and Telegram/channel state); unset = the crew shows global signals and those endpoints report `unconfigured`.
 - `HERMES_PUBLIC_URL` — console-embed URL for the operator's own machine; set empty on remote deployments (the UI then shows an unavailable panel).
 - `NODE_ENV=production` — `Secure` session cookies.
+- `TRIZ_SESSION_SECRET` — stateless HMAC-signed sessions, required on serverless hosts (Vercel) where instances share no memory.
+- `KV_REST_API_URL`/`KV_REST_API_TOKEN` (or the `UPSTASH_REDIS_REST_*` pair) — Upstash-compatible store for the workspace→agent mapping on read-only/serverless filesystems.
 
 ## Architecture
 

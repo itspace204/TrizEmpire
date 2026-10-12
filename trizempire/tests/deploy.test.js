@@ -19,6 +19,7 @@ const { resolveConfig } = require('../lib/config');
 const repoRoot = path.resolve(__dirname, '..', '..');
 const unitPath = path.join(repoRoot, 'deploy', 'trizempire.service');
 const nginxPath = path.join(repoRoot, 'deploy', 'trizempire-nginx.conf');
+const ecosystemPath = path.join(repoRoot, 'deploy', 'ecosystem.config.js');
 const deploymentDocPath = path.join(repoRoot, 'DEPLOYMENT.md');
 
 function read(file) {
@@ -140,6 +141,21 @@ test('unit hardens the sandbox and omits directives that would break node', () =
   assert.equal(svc.MemoryDenyWriteExecute, undefined, 'breaks V8 JIT');
   assert.equal(svc.PrivateNetwork, undefined, 'would remove the listening socket');
 });
+test('unit opens exactly the data dir the app writes (workspace mapping)', () => {
+  const svc = unit.Service;
+  // The server's only disk write is TRIZ_WORKSPACES_FILE (default
+  // <root>/data/workspaces.json). ProtectSystem=strict makes the app tree
+  // read-only, so that directory must be carved out explicitly — and only
+  // that directory, never the whole app tree.
+  assert.equal(svc.ProtectSystem, 'strict');
+  assert.equal(svc.ReadWritePaths,
+    '/opt/trizempire/trizempire/data',
+    'ReadWritePaths must match the unit WorkingDirectory + /data');
+  assert.ok(
+    svc.ReadWritePaths.startsWith(svc.WorkingDirectory),
+    'the writable path must live inside WorkingDirectory'
+  );
+});
 
 test('nginx terminates TLS with the modern protocol policy', () => {
   const body = nginxStatements.join('\n');
@@ -200,6 +216,32 @@ test('DEPLOYMENT.md documents the bundle and its host-side verification', () => 
   const doc = read(deploymentDocPath);
   assert.ok(doc.includes('deploy/trizempire.service'));
   assert.ok(doc.includes('deploy/trizempire-nginx.conf'));
+  assert.ok(doc.includes('deploy/ecosystem.config.js'));
   assert.ok(doc.includes('systemd-analyze verify'));
   assert.ok(doc.includes('nginx -t'));
+  // The two managed targets this guide covers must stay documented.
+  assert.ok(doc.includes('## Vercel (serverless)'));
+  assert.ok(doc.includes('## Hostinger'));
+});
+test('pm2 file pins the same app shape as the unit and the app defaults', () => {
+  // Hostinger's VPS tutorials run Node under pm2; ecosystem.config.js is
+  // the committed counterpart of the systemd unit. It must agree with the
+  // app's own defaults and the nginx proxy target, or a pm2 deployment
+  // silently drifts from the documented bundle.
+  const ecosystem = require(ecosystemPath);
+  assert.ok(Array.isArray(ecosystem.apps) && ecosystem.apps.length === 1,
+    'exactly one app — two managers fighting one port is a misconfiguration');
+  const app = ecosystem.apps[0];
+  assert.equal(app.name, 'trizempire');
+  assert.equal(app.script, 'server.js', 'run node directly, not through npm');
+  assert.ok(!/\bnpm\b/.test(app.script));
+  assert.ok(path.posix.isAbsolute(app.cwd));
+  assert.equal(app.env.NODE_ENV, 'production');
+  assert.equal(app.env.HOST, '127.0.0.1');
+  const defaults = resolveConfig({}, {});
+  assert.equal(Number(app.env.PORT), defaults.port, 'pm2 PORT differs from the app default');
+  assert.equal(app.instances, 1, 'sessions are in-memory — multiple instances would break login affinity');
+  // Same pins as the nginx proxy target.
+  const port = unit.Service.Environment.match(/(^|\n)PORT=(\d+)(\n|$)/)[2];
+  assert.equal(String(app.env.PORT), port);
 });

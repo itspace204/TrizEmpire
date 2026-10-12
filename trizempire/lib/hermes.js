@@ -42,7 +42,10 @@
  *   ACTIVE_WINDOW_SEC mirrors that window so the UI can label it honestly.
  */
 
-const DEFAULT_TIMEOUT_MS = 3000;
+/* Per-attempt ceiling. The aggregation endpoints open per-profile state and
+ * probe gateway liveness — the running gateway's own profile legitimately
+ * takes ~4s, so a lower ceiling mislabels a healthy backend as a timeout. */
+const DEFAULT_TIMEOUT_MS = 8000;
 const MAX_BYTES = 1024 * 1024;
 const ACTIVE_WINDOW_SEC = 300;
 

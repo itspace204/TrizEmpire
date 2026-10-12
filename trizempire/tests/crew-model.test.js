@@ -184,9 +184,7 @@ test('workspaceForProfile resolves assigned profiles and returns null otherwise'
   assert.equal(model.workspaceForProfile('default').id, 'personal');
   assert.equal(model.workspaceForProfile('no-such-profile'), null);
   assert.equal(model.workspaceForProfile(undefined), null);
-});
-
-test('agentsInWorkspace is pure: skips unknown ids, mutates nothing', () => {
+});test('agentsInWorkspace is pure: skips unknown ids, mutates nothing', () => {
   const crew = [{ profile: 'writer', name: 'Writer' }];
   const before = JSON.stringify(crew);
   const client = model.WORKSPACES.find(w => w.id === 'client');
@@ -195,4 +193,46 @@ test('agentsInWorkspace is pure: skips unknown ids, mutates nothing', () => {
   assert.deepEqual(model.agentsInWorkspace(null, crew), []);
   assert.deepEqual(model.agentsInWorkspace(client, null), []);
   assert.equal(JSON.stringify(crew), before, 'the crew list must not be mutated');
+});
+
+/* ── operator overrides (persisted by the server) ──────────────────── */
+test('withAssignments applies operator overrides without mutating the defaults', () => {
+  const snapshot = JSON.stringify(model.WORKSPACES);
+  const next = model.withAssignments(model.WORKSPACES, { client: ['data'] });
+  const byId = (list, id) => list.find(w => w.id === id);
+  assert.deepEqual(byId(next, 'client').profiles, ['data'], 'operator assignment lands');
+  assert.deepEqual(byId(next, 'personal').profiles, ['default'], 'untouched cards keep defaults');
+  assert.deepEqual(byId(next, 'content').profiles, ['writer', 'research']);
+  assert.equal(JSON.stringify(model.WORKSPACES), snapshot, 'the default table must not be mutated');
+  assert.notEqual(next, model.WORKSPACES, 'a NEW array is returned');
+});
+test('withAssignments keeps one home per profile across the merged result', () => {
+  // Moving data out of Work and into Client must remove it from Work too:
+  // the override replaces the whole card, so nothing is ever listed twice.
+  const next = model.withAssignments(model.WORKSPACES, { work: ['developer'], client: ['data'] });
+  const homes = next.flatMap(w => w.profiles);
+  assert.equal(new Set(homes).size, homes.length, 'a profile must have exactly one workspace');
+  assert.deepEqual(next.find(w => w.id === 'client').profiles, ['data']);
+  assert.deepEqual(next.find(w => w.id === 'work').profiles, ['developer']);
+});
+test('withAssignments ignores junk instead of trusting it', () => {
+  const defaults = model.withAssignments(model.WORKSPACES, null);
+  assert.deepEqual(defaults.map(w => w.profiles),
+    model.WORKSPACES.map(w => w.profiles), 'null assignments = defaults');
+  assert.deepEqual(model.withAssignments(model.WORKSPACES, []),
+    model.WORKSPACES.map(w => Object.assign({}, w, { profiles: w.profiles.slice() })),
+    'an array is not an assignment map');
+  const junk = model.withAssignments(model.WORKSPACES, { client: 'data', ghost: ['x'], personal: [42, ''] });
+  assert.deepEqual(junk.find(w => w.id === 'client').profiles, [], 'non-array entry = empty card');
+  assert.deepEqual(junk.find(w => w.id === 'personal').profiles, [], 'non-string/empty ids are dropped');
+  assert.equal(junk.find(w => w.id === 'ghost'), undefined, 'unknown workspace ids do not invent cards');
+  assert.deepEqual(junk.find(w => w.id === 'content').profiles, ['writer', 'research']);
+});
+test('withAssignments can empty a card and works on any workspace list', () => {
+  const next = model.withAssignments(model.WORKSPACES, { personal: [] });
+  assert.deepEqual(next.find(w => w.id === 'personal').profiles, [], 'an empty array empties the card');
+  const custom = [{ id: 'solo', name: 'Solo', profiles: ['a'] }];
+  assert.deepEqual(model.withAssignments(custom, { solo: ['b', 'a'] }).map(w => w.profiles), [['b', 'a']],
+    'order follows the operator\'s list');
+  assert.deepEqual(model.withAssignments(null, {}), [], 'a non-list base yields nothing');
 });
