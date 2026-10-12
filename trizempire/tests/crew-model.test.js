@@ -160,3 +160,39 @@ test('statusInfo covers every declared state and defaults to offline', () => {
   }
   assert.equal(model.statusInfo('bogus').text, 'OFFLINE');
 });
+
+/* ── isolated workspaces (cockpit cards) ────────────────────────────── */
+
+test('workspace membership maps real crew profiles, one home per profile', () => {
+  const crew = ['default', 'research', 'writer', 'developer', 'data'].map(profile => ({ profile }));
+  const byId = id => model.WORKSPACES.find(w => w.id === id);
+  assert.deepEqual(model.agentsInWorkspace(byId('content'), crew).map(a => a.profile),
+    ['writer', 'research']);
+  assert.deepEqual(model.agentsInWorkspace(byId('work'), crew).map(a => a.profile),
+    ['developer', 'data']);
+  assert.deepEqual(model.agentsInWorkspace(byId('personal'), crew).map(a => a.profile),
+    ['default']);
+  // No agent may appear in two cards, and the hero card stays Content.
+  const homes = model.WORKSPACES.flatMap(w => w.profiles);
+  assert.equal(new Set(homes).size, homes.length, 'a profile must have exactly one workspace');
+  assert.equal(byId('content').hero, true);
+});
+
+test('workspaceForProfile resolves assigned profiles and returns null otherwise', () => {
+  assert.equal(model.workspaceForProfile('writer').id, 'content');
+  assert.equal(model.workspaceForProfile('developer').id, 'work');
+  assert.equal(model.workspaceForProfile('default').id, 'personal');
+  assert.equal(model.workspaceForProfile('no-such-profile'), null);
+  assert.equal(model.workspaceForProfile(undefined), null);
+});
+
+test('agentsInWorkspace is pure: skips unknown ids, mutates nothing', () => {
+  const crew = [{ profile: 'writer', name: 'Writer' }];
+  const before = JSON.stringify(crew);
+  const client = model.WORKSPACES.find(w => w.id === 'client');
+  assert.deepEqual(model.agentsInWorkspace(client, crew), [], 'Client starts honestly empty');
+  assert.deepEqual(model.agentsInWorkspace({ profiles: ['ghost'] }, crew), []);
+  assert.deepEqual(model.agentsInWorkspace(null, crew), []);
+  assert.deepEqual(model.agentsInWorkspace(client, null), []);
+  assert.equal(JSON.stringify(crew), before, 'the crew list must not be mutated');
+});

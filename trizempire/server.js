@@ -102,6 +102,14 @@ function resolveOptions(options = {}, env = process.env) {
   return cfg;
 }
 
+/* Read-only per-profile fact routes: same auth gate, same rate limit, same
+ * upstream discipline — only the fetcher and the profile query differ. */
+const PROFILE_FACT_ROUTES = Object.freeze({
+  '/api/hermes/agents': opts => hermesProxy.fetchAgentStates(opts),
+  '/api/hermes/memory': opts => hermesProxy.fetchProfileMemory(opts),
+  '/api/hermes/messaging': opts => hermesProxy.fetchProfileMessaging(opts),
+});
+
 function createServer(options = {}) {
   const cfg = resolveOptions(options);
   const safeRoot = path.resolve(cfg.root);
@@ -243,11 +251,16 @@ function createServer(options = {}) {
         });
     }
 
-    /* ── Hermes per-agent facts (server-side; upstream session token).
+    /* ── Hermes per-profile facts (server-side; upstream session token).
        Read-only, fixed allowlisted upstream paths, same gate and rate limit
-       as the status proxy. Returns FACTS (sessions, activity ages) — the
-       working/idle vocabulary is derived in the UI from these numbers. ── */
-    if (pathname === '/api/hermes/agents') {
+       as the status proxy. Each route returns FACTS the UI derives from:
+         /api/hermes/agents    — session activity → working/idle vocabulary
+         /api/hermes/memory    — per-profile memory provider/file facts
+         /api/hermes/messaging — per-profile channel (telegram bot) facts
+       The profile name is validated inside the proxy and rides only as a
+       query parameter on those fixed paths. ── */
+    const profileFactFetch = PROFILE_FACT_ROUTES[pathname];
+    if (profileFactFetch) {
       if (method !== 'GET') {
         res.setHeader('Allow', 'GET');
         return send(res, 405, 'Method not allowed', undefined, method);
@@ -260,18 +273,19 @@ function createServer(options = {}) {
         res.setHeader('Retry-After', String(limit.retryAfterSeconds));
         return sendJson(res, 429, { error: 'rate_limited' });
       }
-      return hermesProxy
-        .fetchAgentStates({
-          baseUrl: cfg.hermesBaseUrl,
-          sessionToken: cfg.hermesSessionToken,
-          timeoutMs: cfg.hermesTimeoutMs,
-        })
-        .then(result => {
-          const status = result.ok ? 200
+      const profile = new URL(req.url, 'http://localhost').searchParams.get('profile');
+      return profileFactFetch({
+        baseUrl: cfg.hermesBaseUrl,
+        sessionToken: cfg.hermesSessionToken,
+        timeoutMs: cfg.hermesTimeoutMs,
+        profile,
+      }).then(result => {
+        const status = result.ok ? 200
+          : result.state === 'bad_request' ? 400
             : result.state === 'unconfigured' ? 503
               : result.state === 'error' ? 504 : 502;
-          return sendJson(res, status, result);
-        });
+        return sendJson(res, status, result);
+      });
     }
 
     /* ── authorized diagnostics (no paths, env values or tokens) ── */

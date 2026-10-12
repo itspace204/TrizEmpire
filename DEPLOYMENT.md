@@ -314,6 +314,31 @@ Notes and limits — all reported honestly by the endpoint rather than hidden:
 - The token is validated at startup (no line breaks, ≤ 512 chars) and errors
   name the variable without echoing the value.
 
+### Per-profile memory and messaging channels (cockpit workspaces)
+
+The cockpit's ISOLATED WORKSPACES cards drill into a per-agent view driven by
+two more authenticated, profile-scoped proxies — same token, same gates and
+same fixed-path discipline as `/api/hermes/agents`:
+
+```
+GET /api/hermes/memory?profile=NAME     → Hermes /api/memory?profile=NAME
+                                           (active provider, MEMORY.md / USER.md sizes)
+GET /api/hermes/messaging?profile=NAME  → Hermes /api/messaging/platforms?profile=NAME
+                                           (per-channel state — backs "own telegram bot")
+```
+
+- `NAME` is validated (`[A-Za-z0-9][A-Za-z0-9_.-]{0,63}`) and only ever sent
+  as a query parameter on those fixed paths — a bad or missing profile is a
+  local HTTP 400 and the upstream is never probed.
+- Every failure mode matches the agents route: `503 unconfigured` without the
+  token, `502 unauthorized` when Hermes rejects it, `504` for timeout/bad
+  responses, authentication and rate limiting in front.
+- The proxy stays **read-only**: starting or stopping a profile's messaging
+  gateway happens inside the Hermes console, never through TrizEmpire.
+- Workspace→profile membership lives in `trizempire/crew/crew-model.js`
+  (`WORKSPACES`); a profile outside that table simply has no card and stays
+  reachable through the Crew view.
+
 ## Logging and health checks
 
 - Access log: method + pathname + timestamp only (never query strings, bodies,

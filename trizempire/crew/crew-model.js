@@ -128,6 +128,36 @@ function deriveStatusesFromAgents(facts, profiles, status) {
   return map;
 }
 
+/* ── isolated workspaces (cockpit cards) ──────────────────────────── */
+
+/* The cockpit's ISOLATED WORKSPACES cards are an organizational view over
+ * the SAME live profiles the crew uses. Membership is explicit here — one
+ * home per profile — so a card can never silently duplicate an agent.
+ * Profiles this table does not mention (the live Hermes list can grow)
+ * belong to no card and stay reachable through the Crew view; the Client
+ * card stays honestly empty until an operator assigns agents here. */
+const WORKSPACES = [
+  { id: 'content',  name: 'Content',  hero: true,  profiles: ['writer', 'research'] },
+  { id: 'work',     name: 'Work',     hero: false, profiles: ['developer', 'data'] },
+  { id: 'personal', name: 'Personal', hero: false, profiles: ['default'] },
+  { id: 'client',   name: 'Client',   hero: false, profiles: [] },
+];
+
+/* Workspace → its real crew members, in the workspace's declared order.
+ * Pure: never mutates the crew list, unknown ids are skipped honestly. */
+function agentsInWorkspace(workspace, crew) {
+  const ids = workspace && Array.isArray(workspace.profiles) ? workspace.profiles : [];
+  const list = Array.isArray(crew) ? crew : [];
+  return ids
+    .map(id => list.find(c => c && c.profile === id))
+    .filter(Boolean);
+}
+
+/* Which workspace owns this profile — null when unassigned. */
+function workspaceForProfile(profile) {
+  return WORKSPACES.find(ws => Array.isArray(ws.profiles) && ws.profiles.includes(profile)) || null;
+}
+
 /* ── derived roster ────────────────────────────────────────────────── */
 
 /* The right-hand roster is ALWAYS derived from the complete collection:
@@ -187,12 +217,15 @@ const NEXORA_MODEL = {
   OUTFITS,
   ROLE,
   STATUS,
+  WORKSPACES,
   hashId,
   outfitFor,
   roleFor,
   statusInfo,
   deriveStatuses,
   deriveStatusesFromAgents,
+  agentsInWorkspace,
+  workspaceForProfile,
   otherAgents,
   mannequinSVG,
   avatarDataURI,

@@ -293,6 +293,58 @@ body{
 .ws-row .ck{color:var(--orange);font-size:12px}
 .ws-card.hero-card .ws-row .ck{color:#fff}
 
+/* cockpit cards are interactive: card, avatars and rows all drill down */
+.ws-card[data-ws]{cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.ws-card[data-ws]:hover{transform:translateY(-3px);border-color:#ff7a35;box-shadow:0 14px 30px rgba(0,0,0,.4)}
+.ws-card[data-ws]:focus-visible{outline:2px solid #ffb03a;outline-offset:3px}
+.ws-av[data-profile]{cursor:pointer;transition:transform .15s ease}
+.ws-av[data-profile]:hover{transform:scale(1.08)}
+.ws-av .sdot{position:absolute;top:-3px;right:-3px;width:11px;height:11px;border-radius:50%;border:2.5px solid #181008;z-index:2}
+.ws-row[data-jump]{cursor:pointer;transition:background .15s,color .15s,box-shadow .15s}
+.ws-row[data-jump]:hover{background:#2e1f14;color:var(--cream);box-shadow:inset 0 0 0 1px #ff7a35}
+.ws-card.hero-card .ws-row[data-jump]:hover{background:rgba(255,255,255,.3);box-shadow:none}
+.ws-empty{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--muted);text-align:center;border:1px dashed #3a2c22;border-radius:12px;padding:20px 8px;margin:26px 0 auto}
+.ws-card.hero-card .ws-empty{color:rgba(255,255,255,.85);border-color:rgba(255,255,255,.45)}
+
+/* ───────── Isolated workspace drill-down (cockpit cards → detail) ───────── */
+.wsx{display:flex;flex-direction:column;gap:16px;padding-bottom:30px}
+.wsx-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.wsx-back,.wsx-refresh{font-family:var(--mono);font-size:10px;letter-spacing:.14em;background:#181008;border:1px solid #2a1c10;color:var(--muted);border-radius:9px;padding:9px 14px;cursor:pointer;transition:color .15s,border-color .15s}
+.wsx-back:hover,.wsx-refresh:hover{color:var(--cream);border-color:var(--orange)}
+.wsx-title{font-family:var(--serif);font-size:34px;font-weight:400;color:var(--cream)}
+.wsx-iso{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;color:var(--muted);border:1px solid #2a1c10;border-radius:999px;padding:6px 12px}
+.wsx-iso .bx{width:12px;height:12px;border:1px solid currentColor;border-radius:3px;display:grid;place-items:center;font-size:8px}
+.wsx-agents{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch}
+.wsx-agent{display:flex;align-items:center;gap:11px;background:#181008;border:1px solid #2a1c10;border-radius:14px;padding:10px 16px 10px 10px;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s;min-width:0;text-align:left;font:inherit;color:inherit}
+.wsx-agent:hover{border-color:#ff7a35}
+.wsx-agent.on{border-color:var(--orange);background:#221509;box-shadow:0 6px 18px rgba(255,106,26,.14)}
+.wsx-agent img{width:44px;height:44px;border-radius:50%;border:2px solid var(--ring,#ff6a1a);background:#0d0906;flex:0 0 auto}
+.wsx-agent .wn{display:block;font-size:14px;color:var(--cream);font-weight:600;line-height:1.15;white-space:nowrap}
+.wsx-agent .wr{display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;color:var(--muted);margin-top:3px}
+.wsx-agent .wst{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;margin-top:4px}
+.wsx-agent .wst .d{width:7px;height:7px;border-radius:50%;background:currentColor;flex:0 0 auto}
+.wsx-btns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.wsx-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:1100px){.wsx-grid{grid-template-columns:1fr}}
+.wsx-panel{background:#181008;border:1px solid #2a1c10;border-radius:16px;padding:20px;min-width:0}
+.wsx-panel h4{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--orange);margin:0 0 4px}
+.wsx-panel .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;line-height:1.65}
+.wsx-kv{display:flex;justify-content:space-between;gap:14px;background:#241811;border-radius:10px;padding:11px 13px;margin-bottom:9px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em}
+.wsx-kv .k{color:var(--muted);white-space:nowrap}
+.wsx-kv .v{color:var(--cream);text-align:right;overflow-wrap:anywhere}
+.wsx-pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;letter-spacing:.14em;border-radius:999px;padding:4px 10px;border:1px solid #3a2c22;color:var(--muted)}
+.wsx-pill.ok{color:#3ddc84;border-color:rgba(61,220,132,.45)}
+.wsx-pill.warn{color:#ffb03a;border-color:rgba(255,176,58,.45)}
+.wsx-pill.bad{color:#ff6a6a;border-color:rgba(255,106,106,.45)}
+.wsx-state{display:grid;place-items:center;text-align:center;padding:26px 14px;color:var(--muted);font-size:12px;line-height:1.75}
+.wsx-state b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:#ff8a4a;margin-bottom:8px}
+.wsx-empty{grid-column:1/-1;text-align:center;padding:40px 16px;border:1px dashed #3a2c22;border-radius:16px;color:var(--muted);font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;line-height:2.1}
+.wsx-btn{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;background:#241811;border:1px solid #3a2c22;color:var(--cream);border-radius:9px;padding:9px 14px;cursor:pointer;transition:border-color .15s,background .15s}
+.wsx-btn:hover{border-color:var(--orange);background:#2e1f14}
+.wsx-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.wsx-hint{font-family:var(--mono);font-size:9.5px;color:var(--muted);letter-spacing:.08em;background:#241811;border-radius:9px;padding:10px 12px;margin-top:10px;overflow-wrap:anywhere;line-height:1.7}
+.wsx-loading{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--muted);padding:26px 14px;text-align:center}
+
 /* ───────── Agent City ───────── */
 /* ───────── Crew — command center (sidebar · orbital stage · derived roster) ───────── */
 .crew-cx{height:calc(100vh - 89px);margin:-22px -26px -40px;display:grid;grid-template-columns:268px minmax(0,1fr) 306px;position:relative;background:radial-gradient(900px 520px at 50% 16%,rgba(255,106,26,.09),transparent 62%),radial-gradient(700px 420px at 50% 118%,rgba(213,179,138,.05),transparent 60%),var(--bg)}
@@ -591,6 +643,29 @@ body{
         </div>
       </section>
 
+      <!-- ─── ISOLATED WORKSPACE (cockpit card drill-down: agents + per-agent memory/telegram) ─── -->
+      <section class="view" id="view-workspace">
+        <div class="wsx">
+          <div class="wsx-top">
+            <button class="wsx-back" id="wsx-back" aria-label="Back to cockpit">← COCKPIT</button>
+            <span class="wsx-title" id="wsx-title">—</span>
+            <span class="wsx-iso"><span class="bx">▤</span>ISOLATED WORKSPACE</span>
+            <button class="wsx-refresh" id="wsx-refresh" title="Refetch this agent's facts from the backend">↻ REFRESH</button>
+          </div>
+          <div class="wsx-agents" id="wsx-agents" role="group" aria-label="Agents in this workspace"></div>
+          <div class="wsx-grid" id="wsx-detail">
+            <div class="wsx-panel" id="wsx-section-memory">
+              <h4>OWN MEMORY</h4>
+              <div class="wsx-loading">OPENING WORKSPACE…</div>
+            </div>
+            <div class="wsx-panel" id="wsx-section-telegram">
+              <h4>OWN TELEGRAM BOT</h4>
+              <div class="wsx-loading">OPENING WORKSPACE…</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ─── CREW — command center ─── -->
       <section class="view" id="view-crew">
         <div class="crew-cx" id="crew-cx">
@@ -699,35 +774,9 @@ const CREW = [
   {name:"Writer",       profile:"writer",     ring:"#b06aff", msg:"Waiting for live status.",              time:"--:--", unread:0},
   {name:"Developer",    profile:"developer",  ring:"#2fd08a", msg:"Waiting for live status.",              time:"--:--", unread:0},
   {name:"Data",         profile:"data",       ring:"#ff5aa0", msg:"Waiting for live status.",              time:"--:--", unread:0},
-];
-
-/* Isolated workspaces — map real profiles onto the four-box layout.
-   Content is highlighted as the primary workspace (matches the design). */
-const WORKSPACES = [
-  {name:"Content",  hero:true,  agents:[
-    {g:"▶",ring:"#ff6a1a"},{g:"✎",ring:"#3aa0ff"},{g:"▣",ring:"#ff4d4d"}]},
-  {name:"Work",     hero:false, agents:[
-    {g:"M",ring:"#ff6a1a"},{g:"</>",ring:"#2fd08a"},{g:"▥",ring:"#ff5aa0"}]},
-  {name:"Personal", hero:false, agents:[
-    {g:"✈",ring:"#3aa0ff"},{g:"◎",ring:"#2fd08a"},{g:"▤",ring:"#ffb03a"}]},
-  {name:"Client",   hero:false, agents:[
-    {g:"⌕",ring:"#3aa0ff"},{g:"✎",ring:"#b06aff"},{g:"◔",ring:"#ffb03a"}]},
-];
-
-/* ══════ Render: workspaces ══════ */
-document.getElementById('ws-grid').innerHTML = WORKSPACES.map(ws=>`
-  <div class="ws-card ${ws.hero?'hero-card':''}">
-    <h3>${ws.name}</h3>
-    <div class="iso"><span class="bx">▤</span>ISOLATED WORKSPACE</div>
-    <div class="ws-avatars">
-      ${ws.agents.map(a=>`<div class="ws-av" style="--ring:${a.ring};--badge:${ws.hero?'rgba(255,255,255,.25)':'#241811'}"><span class="g">${a.g}</span></div>`).join('')}
-    </div>
-    <div class="ws-rows">
-      <div class="ws-row"><span class="ck">✓</span>OWN AGENTS</div>
-      <div class="ws-row"><span class="ck">✓</span>OWN MEMORY</div>
-      <div class="ws-row"><span class="ck">✓</span>OWN TELEGRAM BOT</div>
-    </div>
-  </div>`).join('');
+];/* Isolated workspaces — the cards are rendered from MODEL.WORKSPACES and the
+   live CREW by renderWorkspaces() (defined with the interactions below), so
+   avatars are the REAL profiles, clickable, and status dots stay honest. */
 
 /* ══════ CREW COMMAND CENTER ══════
    Sidebar (all agents) · orbital stage (selected agent) · right roster
@@ -892,6 +941,7 @@ function applyCrewStatuses(s){
     c.time = t;
   });
   renderCrew();
+  renderWorkspaces();
   window.CrewStage?.updateStatus?.(crewStatuses);
 }
 
@@ -915,6 +965,254 @@ function perAgentMsg(f, key){
 }
 
 renderCrew();
+renderWorkspaces();
+
+/* ══════ Isolated workspaces: cockpit cards + drill-down view ══════
+   The cards are an organizational view over the SAME live CREW: avatars are
+   real profiles, and card / avatar / row all drill into the workspace view,
+   which reads each agent's own memory and messaging-channel (Telegram) facts
+   from the server's authenticated Hermes proxy. Nothing is invented — every
+   state not backed by the backend renders as an honest explanation. */
+
+let currentWs = null;                 // workspace object shown in the drill-down
+let wsxFocus = null;                  // profile whose facts are on display
+const WSX_DETAIL_TEMPLATE = document.getElementById('wsx-detail').innerHTML;
+
+function renderWorkspaces(){
+  const grid = document.getElementById('ws-grid');
+  if(!grid) return;
+  grid.innerHTML = MODEL.WORKSPACES.map(ws=>{
+    const agents = MODEL.agentsInWorkspace(ws, CREW);
+    const avatars = agents.length
+      ? agents.map(a=>{
+          const st = MODEL.statusInfo(crewStatuses[a.profile] || 'offline');
+          return `<div class="ws-av" data-profile="${esc(a.profile)}" role="button" tabindex="0"
+              title="${esc(a.name)} — open the ${esc(ws.name)} workspace"
+              aria-label="${esc(a.name)}, open the ${esc(ws.name)} workspace"
+              style="--ring:${esc(a.ring || '#ff6a1a')};--badge:${ws.hero?'rgba(255,255,255,.25)':'#241811'}">
+              <span class="g">${esc((a.name || a.profile).charAt(0))}</span>
+              <span class="sdot" style="background:${st.css}"></span>
+            </div>`;
+        }).join('')
+      : `<div class="ws-empty">NO AGENTS ASSIGNED</div>`;
+    return `<div class="ws-card ${ws.hero?'hero-card':''}" data-ws="${esc(ws.id)}" role="button" tabindex="0"
+        aria-label="Open the ${esc(ws.name)} isolated workspace">
+        <h3>${esc(ws.name)}</h3>
+        <div class="iso"><span class="bx">▤</span>ISOLATED WORKSPACE</div>
+        <div class="ws-avatars">${avatars}</div>
+        <div class="ws-rows">
+          <div class="ws-row" data-jump="agents" role="button" tabindex="0"><span class="ck">✓</span>OWN AGENTS</div>
+          <div class="ws-row" data-jump="memory" role="button" tabindex="0"><span class="ck">✓</span>OWN MEMORY</div>
+          <div class="ws-row" data-jump="telegram" role="button" tabindex="0"><span class="ck">✓</span>OWN TELEGRAM BOT</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* One delegated handler per container — survives every re-render. */
+document.getElementById('ws-grid').addEventListener('click', e=>{
+  const av = e.target.closest('.ws-av[data-profile]');
+  const row = e.target.closest('.ws-row[data-jump]');
+  const card = e.target.closest('.ws-card[data-ws]');
+  if(!card) return;
+  if(av) openWorkspace(card.dataset.ws, av.dataset.profile, null);
+  else if(row) openWorkspace(card.dataset.ws, null, row.dataset.jump);
+  else openWorkspace(card.dataset.ws, null, null);
+});
+document.getElementById('ws-grid').addEventListener('keydown', e=>{
+  if(e.key !== 'Enter' && e.key !== ' ') return;
+  const t = e.target.closest('[data-ws],[data-profile],[data-jump]');
+  if(!t) return;
+  e.preventDefault();
+  t.click();
+});
+
+function showWorkspaceView(){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-workspace').classList.add('active');
+}
+function closeWorkspace(){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-cockpit').classList.add('active');
+}
+
+function openWorkspace(wsId, focusProfile, jumpSection){
+  const ws = MODEL.WORKSPACES.find(w=>w.id===wsId);
+  if(!ws) return;
+  currentWs = ws;
+  showWorkspaceView();
+  document.getElementById('wsx-title').textContent = ws.name;
+  const agents = MODEL.agentsInWorkspace(ws, CREW);
+  wsxFocus = (focusProfile && agents.some(a=>a.profile===focusProfile))
+    ? focusProfile
+    : (agents.length ? agents[0].profile : null);
+  const detail = document.getElementById('wsx-detail');
+  detail.innerHTML = WSX_DETAIL_TEMPLATE;
+  if(!wsxFocus){
+    document.getElementById('wsx-agents').innerHTML = '';
+    detail.innerHTML = `<div class="wsx-empty">NO AGENTS ASSIGNED TO ${esc(ws.name)} YET.<br>Membership lives in the shared crew model — assign a profile to this workspace and it appears here.</div>`;
+    return;
+  }
+  renderWsxAgents(agents);
+  loadAgentFacts(wsxFocus);
+  if(jumpSection){
+    const target = jumpSection === 'agents'
+      ? document.getElementById('wsx-agents')
+      : document.getElementById('wsx-section-' + jumpSection);
+    if(target) setTimeout(()=>target.scrollIntoView({behavior:'smooth', block:'center'}), 60);
+  }
+}
+
+function renderWsxAgents(agents){
+  const el = document.getElementById('wsx-agents');
+  el.innerHTML = agents.map(a=>{
+    const st = MODEL.statusInfo(crewStatuses[a.profile] || 'offline');
+    return `<button class="wsx-agent ${a.profile===wsxFocus?'on':''}" data-profile="${esc(a.profile)}"
+        style="--ring:${esc(a.ring || '#ff6a1a')}" aria-pressed="${a.profile===wsxFocus}">
+        <img src="${avatarFor(a.profile)}" alt="" />
+        <span>
+          <span class="wn">${esc(a.name)}</span>
+          <span class="wr">${esc(MODEL.roleFor(a.profile))}</span>
+          <span class="wst" style="color:${st.css}"><span class="d"></span>${st.text}</span>
+        </span>
+      </button>`;
+  }).join('') + `
+    <div class="wsx-btns">
+      <button class="wsx-btn" data-act="crew" title="Open this agent in the Crew command center">OPEN IN CREW</button>
+      <button class="wsx-btn" data-act="hermes" title="Open this agent's session in the Hermes dashboard">OPEN IN HERMES ↗</button>
+    </div>`;
+}
+
+document.getElementById('wsx-agents').addEventListener('click', e=>{
+  const act = e.target.closest('[data-act]');
+  if(act && wsxFocus){
+    if(act.dataset.act === 'crew'){
+      selectAgent(wsxFocus);
+      document.querySelector('.nav-item[data-view="crew"]').click();
+    } else {
+      openInHermes(wsxFocus);
+    }
+    return;
+  }
+  const chip = e.target.closest('.wsx-agent[data-profile]');
+  if(!chip || !currentWs) return;
+  wsxFocus = chip.dataset.profile;
+  renderWsxAgents(MODEL.agentsInWorkspace(currentWs, CREW));
+  loadAgentFacts(wsxFocus);
+});
+
+document.getElementById('wsx-back').addEventListener('click', closeWorkspace);
+document.getElementById('wsx-refresh').addEventListener('click', ()=>{ if(wsxFocus) loadAgentFacts(wsxFocus); });
+
+function fmtBytes(n){
+  const v = Number(n) || 0;
+  if(v <= 0) return '0 B';
+  const units = ['B','KB','MB','GB','TB'];
+  let i = 0, x = v;
+  while(x >= 1024 && i < units.length - 1){ x /= 1024; i += 1; }
+  return (x < 10 && i > 0 ? x.toFixed(1) : Math.round(x)) + ' ' + units[i];
+}
+
+/* Honest shared explanation for any state the backend cannot evidence. */
+function factStateHtml(body){
+  const s = body && body.state;
+  if(s === 'unconfigured') return `<div class="wsx-state"><div><b>NOT CONFIGURED</b>Set HERMES_SESSION_TOKEN in the server's .env, paired with HERMES_DASHBOARD_SESSION_TOKEN on the Hermes dashboard, to read per-profile facts.</div></div>`;
+  if(s === 'unauthorized') return `<div class="wsx-state"><div><b>TOKEN REJECTED</b>Hermes refused the session token. Re-pair both sides (same value in both .env files) and restart.</div></div>`;
+  if(s === 'disconnected') return `<div class="wsx-state"><div><b>HERMES UNREACHABLE</b>The server cannot reach the Hermes backend right now. Facts return when the connection is restored.</div></div>`;
+  if(s === 'bad_request') return `<div class="wsx-state"><div><b>INVALID PROFILE</b>The backend rejected this profile name.</div></div>`;
+  if(s === 'error' && body && body.error === 'timeout') return `<div class="wsx-state"><div><b>UPSTREAM TIMEOUT</b>The Hermes backend did not answer in time. Use ↻ REFRESH to retry.</div></div>`;
+  if(s === 'error') return `<div class="wsx-state"><div><b>UPSTREAM ERROR</b>${body && body.error ? esc(String(body.error)) : 'the backend answer was unusable'}</div></div>`;
+  return `<div class="wsx-state"><div><b>UNAVAILABLE</b>No facts for this profile right now.</div></div>`;
+}
+
+async function fetchFact(path, profile){
+  try{
+    const r = await fetch(path + '?profile=' + encodeURIComponent(profile), {cache:'no-store'});
+    if(r.status === 401) return {__login:true};
+    return await r.json();
+  }catch{
+    return {ok:false, state:'disconnected', error:'server_unreachable'};
+  }
+}
+
+async function loadAgentFacts(profile){
+  const mem = document.getElementById('wsx-section-memory');
+  const tel = document.getElementById('wsx-section-telegram');
+  mem.innerHTML = `<h4>OWN MEMORY</h4><div class="wsx-loading">FETCHING ${esc(profile.toUpperCase())} MEMORY…</div>`;
+  tel.innerHTML = `<h4>OWN TELEGRAM BOT</h4><div class="wsx-loading">FETCHING ${esc(profile.toUpperCase())} CHANNELS…</div>`;
+  const [m, t] = await Promise.all([
+    fetchFact('/api/hermes/memory', profile),
+    fetchFact('/api/hermes/messaging', profile),
+  ]);
+  if(m.__login || t.__login){ showLogin(); return; }
+  if(wsxFocus !== profile) return;   // operator already moved on
+  renderMemoryPanel(profile, m);
+  renderTelegramPanel(profile, t);
+}
+
+function renderMemoryPanel(profile, body){
+  const el = document.getElementById('wsx-section-memory');
+  if(!body || body.ok !== true){
+    el.innerHTML = `<h4>OWN MEMORY</h4><div class="sub">${esc(profile)}'s own memory — read from the backend.</div>` + factStateHtml(body);
+    return;
+  }
+  const m = body.memory || {};
+  const provider = m.provider
+    ? `<div class="wsx-kv"><span class="k">PROVIDER</span><span class="v">${esc(m.provider)} <span class="wsx-pill ok">ACTIVE</span></span></div>`
+    : `<div class="wsx-kv"><span class="k">PROVIDER</span><span class="v">BUILT-IN MEMORY FILES</span></div>`;
+  const memB = Number(m.files && m.files.memoryBytes) || 0;
+  const usrB = Number(m.files && m.files.userBytes) || 0;
+  const files = `
+    <div class="wsx-kv"><span class="k">MEMORY.md</span><span class="v">${memB ? fmtBytes(memB) : 'empty'}</span></div>
+    <div class="wsx-kv"><span class="k">USER.md</span><span class="v">${usrB ? fmtBytes(usrB) : 'empty'}</span></div>`;
+  const providers = Array.isArray(m.providers) && m.providers.length
+    ? `<div class="wsx-chips">` + m.providers.map(p=>{
+        const cls = (p.configured && p.available) ? 'ok' : ((p.configured || p.available) ? 'warn' : 'bad');
+        const label = p.status ? p.status.toUpperCase() : (p.configured ? 'CONFIGURED' : 'NOT CONFIGURED');
+        return `<span class="wsx-pill ${cls}" title="${esc(p.description)}">${esc(p.name)} · ${esc(label)}</span>`;
+      }).join('') + `</div>`
+    : `<div class="wsx-hint">No external memory providers discovered — this profile uses the built-in files above.</div>`;
+  el.innerHTML = `<h4>OWN MEMORY</h4>
+    <div class="sub">${esc(profile)}'s own memory — sizes and provider state come from the backend, never estimated.</div>
+    ${provider}${files}${providers}`;
+}
+
+function statePillClass(state){
+  if(state === 'connected' || state === 'ok' || state === 'active') return 'ok';
+  if(state === 'startup_failed' || state === 'fatal' || state === 'error') return 'bad';
+  if(!state) return '';
+  return 'warn';
+}
+
+function renderTelegramPanel(profile, body){
+  const el = document.getElementById('wsx-section-telegram');
+  const head = `<h4>OWN TELEGRAM BOT</h4><div class="sub">${esc(profile)}'s own Telegram channel — live state from the Hermes gateway.</div>`;
+  if(!body || body.ok !== true){
+    el.innerHTML = head + factStateHtml(body);
+    return;
+  }
+  const m = body.messaging || {};
+  const list = Array.isArray(m.platforms) ? m.platforms : [];
+  const tg = list.find(p=>p.id==='telegram');
+  if(!tg){
+    el.innerHTML = head + `<div class="wsx-state"><div><b>NO TELEGRAM CHANNEL</b>Hermes does not list a Telegram channel for this profile.</div></div>`;
+    return;
+  }
+  const rows = `
+    <div class="wsx-kv"><span class="k">STATE</span><span class="v"><span class="wsx-pill ${statePillClass(tg.state)}">${esc((tg.state || 'unknown').toUpperCase())}</span></span></div>
+    <div class="wsx-kv"><span class="k">ENABLED</span><span class="v">${tg.enabled ? 'YES' : 'NO'}</span></div>
+    <div class="wsx-kv"><span class="k">CONFIGURED</span><span class="v">${tg.configured ? 'YES — credentials present' : 'NO — credentials missing'}</span></div>
+    <div class="wsx-kv"><span class="k">GATEWAY</span><span class="v">${m.gatewayRunning ? 'RUNNING' : 'STOPPED'}</span></div>`;
+  const err = (tg.errorMessage || tg.errorCode)
+    ? `<div class="wsx-hint">${esc(tg.errorMessage || tg.errorCode)}</div>` : '';
+  const hint = !m.gatewayRunning && m.startCommand
+    ? `<div class="wsx-hint">Gateway stopped — start it with: ${esc(m.startCommand)}</div>` : '';
+  const othersList = list.filter(p=>p.id!=='telegram');
+  const others = othersList.length
+    ? `<div class="wsx-hint">Other channels: ${othersList.map(p=>esc(p.name || p.id) + ' — ' + esc(p.state || 'unknown')).join(' · ')}</div>`
+    : '';
+  el.innerHTML = head + rows + err + hint + others;
+}
 
 /* interactions */
 crewEls.side.addEventListener('click', e => {
@@ -1005,7 +1303,15 @@ async function loadHermes(){
     markOffline(hermesState === 'disconnected' ? 'Hermes backend unreachable' : 'Hermes upstream error');
     return;
   }
+  const wasConnected = hermesState === 'connected';
   hermesState = 'connected'; setConnChip(hermesState);
+  /* A restored connection brings an open, unavailable console back on its own
+     — the operator should not have to re-click to recover the embed. */
+  if(!wasConnected
+      && document.getElementById('view-console').classList.contains('active')
+      && document.getElementById('console-unavailable').style.display !== 'none'){
+    loadConsole(currentProfile);
+  }
   const s = body.status;
 
   /* real crew list */
@@ -1088,7 +1394,7 @@ function rebuildCrew(profiles){
   if(!CREW.some(c => c.profile === selectedAgentId)){
     selectedAgentId = CREW.length ? CREW[0].profile : null;
   }
-  renderCrew(); buildProfilePicks();
+  renderCrew(); buildProfilePicks(); renderWorkspaces();
   window.City3D?.rebuild?.();
   window.CrewStage?.rebuild?.();
 }
@@ -1124,7 +1430,14 @@ function showConsoleUnavailable(){
   }
 }
 function loadConsole(profile){
-  currentProfile = profile;
+  /* The console picker is part of the shared selection (the same promise the
+     TrizEmpire setter makes): picking a profile here selects it everywhere —
+     crew stage, roster and Agent City included. */
+  if(typeof selectAgent === 'function' && CREW.some(c=>c.profile===profile) && selectedAgentId !== profile){
+    selectAgent(profile);
+  } else {
+    currentProfile = profile;
+  }
   const f = document.getElementById('console-frame');
   const l = document.getElementById('console-loading');
   const u = document.getElementById('console-unavailable');

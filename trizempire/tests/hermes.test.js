@@ -271,7 +271,12 @@ test('the upstream path allowlist rejects anything a caller could inject', () =>
     assert.equal(hermes.upstreamUrl(base, evil), null, `must reject ${evil}`);
   }
   assert.deepEqual([...hermes.UPSTREAM_PATHS].sort(),
-    ['/api/profiles', '/api/profiles/sessions', '/api/status']);
+    ['/api/memory', '/api/messaging/platforms', '/api/profiles', '/api/profiles/sessions', '/api/status']);
+  // Profile names only ever ride as a validated query parameter.
+  assert.equal(hermes.PROFILE_RE.test('writer'), true);
+  assert.equal(hermes.PROFILE_RE.test('../../etc/passwd'), false);
+  assert.equal(hermes.PROFILE_RE.test('a b'), false);
+  assert.equal(hermes.PROFILE_RE.test(''), false);
 });
 
 test('real Hermes backend (when running) is reached through the proxy', async t => {
@@ -294,4 +299,123 @@ test('real Hermes backend (when running) is reached through the proxy', async t 
     assert.equal(typeof body.status.gateway_running, 'boolean');
     assert.ok(Array.isArray(body.status.profiles));
   }, { users: [], hermesBaseUrl: 'http://127.0.0.1:9119' });
+});
+
+/* ── per-profile fact endpoints: memory + messaging (telegram) ─────── */
+
+test('memory and messaging forward the profile, carry the token, normalize facts', async () => {
+  const TOKEN = 'paired-session-token';
+  const seen = [];
+  await withUpstream((req, res) => {
+    const u = new URL(req.url, 'http://upstream');
+    seen.push({
+      path: u.pathname,
+      profile: u.searchParams.get('profile'),
+      token: req.headers['x-hermes-session-token'],
+    });
+    if (u.pathname === '/api/memory') {
+      return replyJson(res, {
+        active: '',
+        providers: [{ name: 'graphite', description: 'g', available: true, configured: true, status: 'ready' }],
+        builtin_files: { memory: 2048, user: 10 },
+      });
+    }
+    return replyJson(res, {
+      gateway_start_command: 'hermes gateway start --profile writer',
+      platforms: [
+        { id: 'telegram', name: 'Telegram', enabled: true, configured: true,
+          gateway_running: true, state: 'connected', error_code: null, error_message: null },
+        { id: 'whatsapp', name: 'WhatsApp', enabled: false, configured: false,
+          gateway_running: true, state: 'disabled' },
+      ],
+    });
+  }, async upstreamBase => {
+    await withServer(async base => {
+      const mem = await fetch(`${base}/api/hermes/memory?profile=writer`);
+      assert.equal(mem.status, 200);
+      const mb = await mem.json();
+      assert.equal(mb.ok, true);
+      assert.equal(mb.state, 'connected');
+      assert.equal(mb.memory.provider, '');           // built-in files, no external provider
+      assert.equal(mb.memory.files.memoryBytes, 2048);
+      assert.equal(mb.memory.files.userBytes, 10);
+      assert.equal(mb.memory.providers[0].name, 'graphite');
+      assert.equal(mb.memory.providers[0].configured, true);
+
+      const msg = await fetch(`${base}/api/hermes/messaging?profile=writer`);
+      assert.equal(msg.status, 200);
+      const tb = await msg.json();
+      assert.equal(tb.ok, true);
+      assert.equal(tb.messaging.gatewayRunning, true);
+      assert.match(tb.messaging.startCommand, /gateway start/);
+      const tg = tb.messaging.platforms.find(p => p.id === 'telegram');
+      assert.equal(tg.state, 'connected');
+      assert.equal(tg.enabled, true);
+      assert.equal(tg.configured, true);
+      assert.equal(tg.gatewayRunning, true);
+
+      // Exactly the two fixed paths, both with the profile query + token.
+      assert.deepEqual(seen.map(s => `${s.path}?${s.profile}`),
+        ['/api/memory?writer', '/api/messaging/platforms?writer']);
+      for (const s of seen) assert.equal(s.token, TOKEN);
+    }, { users: [], hermesBaseUrl: upstreamBase, hermesSessionToken: TOKEN });
+  });
+});
+
+test('a bad profile is rejected locally (400) and never reaches the upstream', async () => {
+  let hits = 0;
+  await withUpstream((req, res) => {
+    hits += 1;
+    replyJson(res, {});
+  }, async upstreamBase => {
+    await withServer(async base => {
+      for (const evil of ['../../etc/passwd', '../x', 'a b', 'x/y', '']) {
+        const res = await fetch(`${base}/api/hermes/memory?profile=${encodeURIComponent(evil)}`);
+        assert.equal(res.status, 400, `must reject ${JSON.stringify(evil)}`);
+        const body = await res.json();
+        assert.equal(body.ok, false);
+        assert.equal(body.state, 'bad_request');
+        assert.equal(body.error, 'bad_profile');
+      }
+      const missing = await fetch(`${base}/api/hermes/messaging`);
+      assert.equal(missing.status, 400, 'a missing profile is also a bad request');
+    }, { users: [], hermesBaseUrl: upstreamBase, hermesSessionToken: 't' });
+  });
+  assert.equal(hits, 0, 'invalid profiles must not probe the upstream');
+});
+
+test('memory/messaging report unconfigured (503) without a token and touch no upstream', async () => {
+  let hits = 0;
+  await withUpstream((req, res) => {
+    hits += 1;
+    replyJson(res, {});
+  }, async upstreamBase => {
+    await withServer(async base => {
+      for (const path of ['/api/hermes/memory?profile=default', '/api/hermes/messaging?profile=default']) {
+        const res = await fetch(`${base}${path}`);
+        assert.equal(res.status, 503);
+        const body = await res.json();
+        assert.equal(body.ok, false);
+        assert.equal(body.state, 'unconfigured');
+        assert.equal(body.error, 'no_session_token');
+        assert.equal(body.memory, undefined, 'no fabricated memory');
+        assert.equal(body.messaging, undefined, 'no fabricated channels');
+      }
+    }, { users: [], hermesBaseUrl: upstreamBase });
+  });
+  assert.equal(hits, 0, 'an unconfigured server must not probe the upstream');
+});
+
+test('memory/messaging require an authenticated session when auth is configured', async () => {
+  await withServer(async base => {
+    const anon = await fetch(`${base}/api/hermes/memory?profile=default`);
+    assert.equal(anon.status, 401);
+    const anon2 = await fetch(`${base}/api/hermes/messaging?profile=default`);
+    assert.equal(anon2.status, 401);
+  }, {
+    users: [{ username: 'admin', role: 'admin', hash: ADMIN_HASH }],
+    secureCookies: false,
+    hermesBaseUrl: 'http://127.0.0.1:9',
+    hermesSessionToken: 'unused-here',
+  });
 });

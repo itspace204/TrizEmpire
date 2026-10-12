@@ -13,14 +13,20 @@
  *   fetchAgentStates() → { ok: true, state: 'connected', activeWindowSec, agents: [...] }
  *                      | { ok: false, state: 'unauthorized' | 'unconfigured' | ... }
  *
+ *   fetchProfileMemory()  → { ok, state, memory: { provider, files, providers } }
+ *   fetchProfileMessaging() → { ok, state, messaging: { gatewayRunning,
+ *                                  startCommand, platforms } }
+ *   (the last two additionally take a profile name, validated and passed as
+ *    a query parameter on fixed upstream paths — never part of the path)
+ *
  * Hard limits by design:
  * - only GET, only paths from the fixed UPSTREAM_PATHS allowlist (never a
  *   user-controlled URL or path, so this can not be used as an open proxy),
  * - per-attempt timeout, one retry on network errors,
  * - 1 MiB response cap, JSON content-type enforcement,
- * - the upstream session token is sent only to the two authenticated
- *   per-agent paths, never to the public /api/status probe, and never to
- *   browsers.
+ * - the upstream session token is sent only to the authenticated
+ *   per-profile paths (/api/profiles*, /api/memory, /api/messaging/platforms),
+ *   never to the public /api/status probe, and never to browsers.
  *
  * Upstream auth (verified against the Hermes source):
  * - /api/status and /api/health are on Hermes' public path list; no credent-
@@ -46,7 +52,15 @@ const UPSTREAM_PATHS = Object.freeze([
   '/api/status',
   '/api/profiles',
   '/api/profiles/sessions',
+  '/api/memory',
+  '/api/messaging/platforms',
 ]);
+
+/* Profile names are caller-supplied. They only ever ride as a query
+ * parameter on a fixed allowlisted path (never part of the path itself),
+ * and are additionally restricted to sane identifier characters before
+ * anything is encoded and forwarded. */
+const PROFILE_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
 
 function normalizeBaseUrl(raw) {
   try {
@@ -226,13 +240,114 @@ async function fetchAgentStates({
   return normalizeAgents(profiles.body, sessions.body);
 }
 
+/* Shared preamble for the per-profile fact endpoints: token present, profile
+ * sane, path allowlisted. Returns either { failure } (already normalized) or
+ * { url } ready to fetch with the session token attached. Never throws. */
+function profileRequestUrl({ baseUrl, sessionToken = '', profile, path }) {
+  if (!sessionToken) {
+    return { failure: { ok: false, state: 'unconfigured', error: 'no_session_token' } };
+  }
+  if (typeof profile !== 'string' || !PROFILE_RE.test(profile)) {
+    return { failure: { ok: false, state: 'bad_request', error: 'bad_profile' } };
+  }
+  const url = upstreamUrl(baseUrl, path);
+  if (!url) {
+    return { failure: { ok: false, state: 'error', error: 'bad_upstream_config' } };
+  }
+  url.search = new URLSearchParams({ profile }).toString();
+  return { url };
+}
+
+/* One profile's memory facts (Hermes GET /api/memory?profile=…): which
+ * provider is active, how large the built-in MEMORY.md / USER.md files are,
+ * and every discovered provider's readiness. Read-only; never throws. */
+async function fetchProfileMemory({
+  baseUrl,
+  sessionToken = '',
+  profile,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  retryDelayMs = 150,
+} = {}) {
+  const { failure, url } = profileRequestUrl({ baseUrl, sessionToken, profile, path: '/api/memory' });
+  if (failure) return failure;
+  const result = await fetchJson(url, timeoutMs, { sessionToken, retryDelayMs });
+  if (!result.ok) return result;
+  const body = result.body || {};
+  const files = body.builtin_files && typeof body.builtin_files === 'object' ? body.builtin_files : {};
+  const providers = Array.isArray(body.providers) ? body.providers : [];
+  return {
+    ok: true,
+    state: 'connected',
+    memory: {
+      // '' means the profile runs on the built-in memory files (no external
+      // provider configured) — reported as-is, never guessed.
+      provider: typeof body.active === 'string' ? body.active : '',
+      files: {
+        memoryBytes: Number.isFinite(Number(files.memory)) ? Math.max(0, Number(files.memory)) : 0,
+        userBytes: Number.isFinite(Number(files.user)) ? Math.max(0, Number(files.user)) : 0,
+      },
+      providers: providers.map(p => ({
+        name: String((p && p.name) || ''),
+        description: String((p && p.description) || ''),
+        available: !!(p && p.available),
+        configured: !!(p && p.configured),
+        status: p && typeof p.status === 'string' ? p.status : '',
+      })),
+    },
+  };
+}
+
+/* One profile's messaging-channel facts (Hermes GET /api/messaging/platforms
+ * ?profile=…): per-channel enabled/configured/state plus gateway liveness —
+ * this is what backs "own telegram bot" per agent. Read-only: starting or
+ * stopping the gateway stays inside the Hermes console, this proxy never
+ * mutates upstream state. Never throws. */
+async function fetchProfileMessaging({
+  baseUrl,
+  sessionToken = '',
+  profile,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  retryDelayMs = 150,
+} = {}) {
+  const { failure, url } = profileRequestUrl({ baseUrl, sessionToken, profile, path: '/api/messaging/platforms' });
+  if (failure) return failure;
+  const result = await fetchJson(url, timeoutMs, { sessionToken, retryDelayMs });
+  if (!result.ok) return result;
+  const body = result.body || {};
+  const raw = Array.isArray(body.platforms) ? body.platforms : [];
+  const platforms = raw.map(p => ({
+    id: String((p && p.id) || ''),
+    name: String((p && p.name) || ''),
+    enabled: !!(p && p.enabled),
+    configured: !!(p && p.configured),
+    gatewayRunning: !!(p && p.gateway_running),
+    state: p && typeof p.state === 'string' ? p.state : '',
+    errorCode: p && typeof p.error_code === 'string' ? p.error_code : '',
+    errorMessage: p && typeof p.error_message === 'string' ? p.error_message : '',
+  }));
+  return {
+    ok: true,
+    state: 'connected',
+    messaging: {
+      // The liveness verdict is the same for every channel of a profile; the
+      // payload carries it per channel, so derive it from the channels seen.
+      gatewayRunning: platforms.some(p => p.gatewayRunning),
+      startCommand: typeof body.gateway_start_command === 'string' ? body.gateway_start_command : '',
+      platforms,
+    },
+  };
+}
+
 module.exports = {
   fetchStatus,
   fetchAgentStates,
+  fetchProfileMemory,
+  fetchProfileMessaging,
   normalizeAgents,
   normalizeBaseUrl,
   upstreamUrl,
   UPSTREAM_PATHS,
+  PROFILE_RE,
   ACTIVE_WINDOW_SEC,
   DEFAULT_TIMEOUT_MS,
 };
