@@ -59,12 +59,32 @@ test('invalid values are rejected with messages that name the variable', () => {
     [{ HERMES_PUBLIC_URL: 'javascript:alert(1)' }, /HERMES_PUBLIC_URL/],
     [{ HERMES_TIMEOUT_MS: 'soon' }, /HERMES_TIMEOUT_MS/],
     [{ HERMES_TIMEOUT_MS: '0' }, /HERMES_TIMEOUT_MS/],
+    [{ HERMES_SESSION_TOKEN: 'line\nbreak' }, /HERMES_SESSION_TOKEN/],
+    [{ HERMES_SESSION_TOKEN: 'x'.repeat(513) }, /HERMES_SESSION_TOKEN/],
     [{ TRIZ_ADMIN_PASSWORD_HASH: 'plainly-not-scrypt' }, /TRIZ_ADMIN_PASSWORD_HASH/],
   ];
   for (const [env, pattern] of cases) {
     assert.throws(() => resolveConfig({}, env), pattern,
       `expected rejection for ${Object.keys(env)[0]}`);
   }
+});
+
+test('HERMES_SESSION_TOKEN is accepted when clean and never echoed in errors', () => {
+  const secret = 'test-only-upstream-token-value';
+  // Unconfigured by default: the endpoint reports "unconfigured", not a guess.
+  assert.equal(resolveConfig({}, {}).hermesSessionToken, '');
+  assert.equal(resolveConfig({}, { HERMES_SESSION_TOKEN: secret }).hermesSessionToken, secret);
+  assert.equal(resolveConfig({ hermesSessionToken: secret }, {}).hermesSessionToken, secret);
+  // A header-injection attempt names the variable and leaks nothing of the value.
+  assert.throws(
+    () => resolveConfig({}, { HERMES_SESSION_TOKEN: `${secret}\r\nX-Injected: 1` }),
+    err => {
+      assert.match(err.message, /HERMES_SESSION_TOKEN/);
+      assert.ok(!err.message.includes(secret), 'the error must not echo the token');
+      assert.ok(!err.message.includes('X-Injected'), 'the error must not echo the payload');
+      return true;
+    },
+  );
 });
 
 test('PORT=0 (ephemeral) is rejected in production but allowed locally', () => {
@@ -182,6 +202,7 @@ test('.env.example exists, documents every variable, and holds no credentials', 
     'TRIZ_ADMIN_PASSWORD_HASH', 'TRIZ_OPERATOR_PASSWORD_HASH',
     'TRIZ_SESSION_TTL_MINUTES', 'TRIZ_SESSION_ABS_MINUTES', 'TRIZ_SECURE_COOKIE',
     'HERMES_BASE_URL', 'HERMES_PUBLIC_URL', 'HERMES_TIMEOUT_MS',
+    'HERMES_SESSION_TOKEN',
   ]) {
     assert.ok(raw.includes(name), `.env.example must document ${name}`);
   }

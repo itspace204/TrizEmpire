@@ -40,10 +40,13 @@ Binding behavior:
   `nosniff`, no-referrer, `Cache-Control: no-store`, GET/HEAD-only static
   serving from an explicit path allowlist, symlink-escape and traversal
   protection, generic error responses.
-- **Hermes proxy:** the browser only reaches Hermes via the server-side
-  `/api/hermes/status` endpoint, which fetches a single fixed upstream path
-  with timeouts, one retry and a 1 MiB response cap. It cannot be used as an
-  open network proxy.
+- **Hermes proxy:** the browser only reaches Hermes via server-side
+  endpoints (`/api/hermes/status`, `/api/hermes/agents`), which fetch only
+  from a fixed allowlist of upstream paths with timeouts, one retry and a
+  1 MiB response cap. It cannot be used as an open network proxy. The
+  upstream session token (`HERMES_SESSION_TOKEN`) travels only to the two
+  authenticated per-agent paths, never to `/api/status`, never to browsers,
+  and never into logs or error messages.
 - **Logging:** method + pathname only for access logs; auth events log
   username and address, never passwords, hashes, cookies or request bodies.
 
@@ -65,7 +68,9 @@ sharing technical details.
 - The embedded Hermes console iframe is a **local-only** feature
   (`HERMES_PUBLIC_URL`); on remote deployments it must be disabled, which the
   UI enforces with an unavailable panel.
-- Per-agent status coloring derives from global backend signals; authenticated
-  per-profile Hermes endpoints are not yet integrated.
+- Per-agent status coloring uses real per-profile session data when
+  `HERMES_SESSION_TOKEN` is configured; otherwise (or behind an OAuth-gated
+  Hermes dashboard) it falls back to global backend signals and reports the
+  per-agent endpoint as `unconfigured`/`unauthorized` rather than guessing.
 - The embedded Hermes backend's own security posture is out of scope here:
   this server only consumes its public `/api/status` endpoint.

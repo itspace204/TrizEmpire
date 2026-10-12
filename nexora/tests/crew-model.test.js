@@ -107,6 +107,51 @@ test('deriveStatuses reports ready when the gateway is up with nothing running',
   for (const id of ids) assert.equal(map[id], 'ready');
 });
 
+/* ── real per-agent facts → states ───────────────────────────────────── */
+
+test('deriveStatusesFromAgents marks exactly the profiles with an active session', () => {
+  const ids = AGENTS.map(a => a.id);
+  const facts = [
+    { profile: 'default', sessions: 4, activeSessions: 0, lastActiveAgeSec: 900 },
+    { profile: 'research', sessions: 1, activeSessions: 2, lastActiveAgeSec: 3 },
+    { profile: 'writer', sessions: 0, activeSessions: 0, lastActiveAgeSec: null },
+  ];
+  const map = model.deriveStatusesFromAgents(facts, ids, { gateway_running: true, active_agents: 3 });
+  assert.equal(map.research, 'working', 'its own sessions say so');
+  assert.equal(map.default, 'idle', 'someone else is working');
+  assert.equal(map.writer, 'idle');
+  assert.equal(map.data, 'idle', 'a profile Hermes never mentioned is never working');
+  // Per-agent facts beat the global count: 3 agents are "active" upstream,
+  // but only research has session evidence here.
+  assert.notEqual(map.default, 'working');
+});
+
+test('deriveStatusesFromAgents reports ready when no session is active anywhere', () => {
+  const ids = AGENTS.map(a => a.id);
+  const facts = ids.map(profile => ({ profile, sessions: 2, activeSessions: 0, lastActiveAgeSec: 45 }));
+  const map = model.deriveStatusesFromAgents(facts, ids, { gateway_running: true, active_agents: 1 });
+  for (const id of ids) assert.equal(map[id], 'ready');
+});
+
+test('deriveStatusesFromAgents stays offline for every agent when the gateway is down', () => {
+  const ids = AGENTS.map(a => a.id);
+  const facts = ids.map(profile => ({ profile, sessions: 1, activeSessions: 5, lastActiveAgeSec: 0 }));
+  const map = model.deriveStatusesFromAgents(facts, ids, { gateway_running: false });
+  for (const id of ids) assert.equal(map[id], 'offline');
+  assert.deepEqual(model.deriveStatusesFromAgents(null, ids, null),
+    Object.fromEntries(ids.map(id => [id, 'offline'])));
+});
+
+test('deriveStatusesFromAgents returns every crew profile and mutates nothing', () => {
+  const ids = AGENTS.map(a => a.id);
+  const facts = [{ profile: 'default', sessions: 1, activeSessions: 1, lastActiveAgeSec: 1 }];
+  const snapshot = JSON.stringify(facts);
+  const map = model.deriveStatusesFromAgents(facts, ids, { gateway_running: true });
+  assert.deepEqual(Object.keys(map).sort(), [...ids].sort());
+  assert.equal(JSON.stringify(facts), snapshot, 'facts must not be mutated');
+  assert.deepEqual(AGENTS.map(a => a.id), ['default', 'research', 'writer', 'developer', 'data']);
+});
+
 test('statusInfo covers every declared state and defaults to offline', () => {
   for (const key of Object.keys(model.STATUS)) {
     const info = model.statusInfo(key);

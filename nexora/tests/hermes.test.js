@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const { createServer } = require('../server');
 const { hashPassword } = require('../lib/auth');
+const hermes = require('../lib/hermes');
 
 const ADMIN_HASH = hashPassword('correct horse battery staple');
 
@@ -131,6 +132,146 @@ test('proxy requires authentication when configured', async () => {
     secureCookies: false,
     hermesBaseUrl: 'http://127.0.0.1:9',
   });
+});
+
+/* ── per-agent endpoints (authenticated upstream) ──────────────────────── */
+
+function replyJson(res, body) {
+  res.writeHead(200, { 'content-type': 'application/json' });
+  res.end(JSON.stringify(body));
+}
+
+test('per-agent endpoint authenticates upstream and fetches only allowlisted paths', async () => {
+  const seen = [];
+  const TOKEN = 'upstream-session-token-for-tests';
+  const now = Math.floor(Date.now() / 1000);
+  await withUpstream((req, res) => {
+    const path = req.url.split('?')[0];
+    seen.push({ path, token: req.headers['x-hermes-session-token'] || null });
+    if (path === '/api/profiles/sessions') {
+      return replyJson(res, {
+        sessions: [
+          { profile: 'default', is_active: true, last_active: now - 5 },
+          { profile: 'default', is_active: false, last_active: now - 7200 },
+          { profile: 'data', is_active: false, last_active: now - 600 },
+        ],
+      });
+    }
+    if (path === '/api/profiles') {
+      return replyJson(res, {
+        profiles: [
+          { name: 'default', gateway_running: true },
+          { name: 'data', gateway_running: true },
+        ],
+      });
+    }
+    res.writeHead(404, { 'content-type': 'application/json' });
+    res.end('{}');
+  }, async upstreamBase => {
+    await withServer(async base => {
+      const res = await fetch(`${base}/api/hermes/agents`);
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.ok, true);
+      assert.equal(body.state, 'connected');
+      assert.equal(body.activeWindowSec, 300); // Hermes' own is_active window
+      const byName = Object.fromEntries(body.agents.map(a => [a.profile, a]));
+      assert.equal(byName.default.activeSessions, 1, 'the active session counts');
+      assert.equal(byName.default.sessions, 2);
+      assert.ok(Number.isFinite(byName.default.lastActiveAgeSec));
+      assert.equal(byName.data.activeSessions, 0);
+      assert.ok(Math.abs(byName.data.lastActiveAgeSec - 600) <= 2);
+      // Exactly the two allowlisted paths, both carrying the session token.
+      assert.deepEqual(seen.map(s => s.path), ['/api/profiles', '/api/profiles/sessions']);
+      for (const s of seen) assert.equal(s.token, TOKEN);
+    }, { users: [], hermesBaseUrl: upstreamBase, hermesSessionToken: TOKEN });
+  });
+});
+
+test('without a session token the endpoint reports unconfigured and touches no upstream', async () => {
+  let hits = 0;
+  await withUpstream((req, res) => {
+    hits += 1;
+    replyJson(res, {});
+  }, async upstreamBase => {
+    await withServer(async base => {
+      const res = await fetch(`${base}/api/hermes/agents`);
+      assert.equal(res.status, 503);
+      const body = await res.json();
+      assert.equal(body.ok, false);
+      assert.equal(body.state, 'unconfigured');
+      assert.equal(body.error, 'no_session_token');
+      assert.deepEqual(body.agents, undefined, 'no fabricated agents');
+    }, { users: [], hermesBaseUrl: upstreamBase });
+  });
+  assert.equal(hits, 0, 'an unconfigured server must not probe the upstream');
+});
+
+test('an upstream 401 is reported as unauthorized, not as a disconnected backend', async () => {
+  await withUpstream((req, res) => {
+    res.writeHead(401, { 'content-type': 'application/json' });
+    res.end('{"detail":"Unauthorized"}');
+  }, async upstreamBase => {
+    await withServer(async base => {
+      const res = await fetch(`${base}/api/hermes/agents`);
+      assert.equal(res.status, 502);
+      const body = await res.json();
+      assert.equal(body.ok, false);
+      assert.equal(body.state, 'unauthorized');
+      assert.notEqual(body.state, 'disconnected');
+    }, { users: [], hermesBaseUrl: upstreamBase, hermesSessionToken: 'stale-token' });
+  });
+});
+
+test('the session token is never sent to the public status probe', async () => {
+  const tokens = [];
+  await withUpstream((req, res) => {
+    tokens.push(req.headers['x-hermes-session-token'] || null);
+    replyJson(res, { gateway_running: true });
+  }, async upstreamBase => {
+    await withServer(async base => {
+      const res = await fetch(`${base}/api/hermes/status`);
+      assert.equal(res.status, 200);
+    }, {
+      users: [],
+      hermesBaseUrl: upstreamBase,
+      hermesSessionToken: 'should-not-travel',
+    });
+  });
+  assert.deepEqual(tokens, [null], 'the public probe needs no credentials');
+});
+
+test('per-agent endpoint requires an authenticated session when auth is configured', async () => {
+  await withServer(async base => {
+    const anon = await fetch(`${base}/api/hermes/agents`);
+    assert.equal(anon.status, 401);
+    const login = await fetch(`${base}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: base },
+      body: JSON.stringify({ username: 'admin', password: 'correct horse battery staple' }),
+    });
+    const cookie = (login.headers.get('set-cookie') || '').split(';')[0];
+    const authed = await fetch(`${base}/api/hermes/agents`, { headers: { cookie } });
+    assert.equal(authed.status, 502); // upstream is a closed port in this test
+    assert.equal((await authed.json()).state, 'disconnected');
+  }, {
+    users: [{ username: 'admin', role: 'admin', hash: ADMIN_HASH }],
+    secureCookies: false,
+    hermesBaseUrl: 'http://127.0.0.1:9',
+    hermesSessionToken: 'unused-here',
+  });
+});
+
+test('the upstream path allowlist rejects anything a caller could inject', () => {
+  const base = 'http://127.0.0.1:9119';
+  assert.equal(hermes.upstreamUrl(base, '/api/status').pathname, '/api/status');
+  assert.equal(hermes.upstreamUrl(base, '/api/profiles').pathname, '/api/profiles');
+  for (const evil of ['/etc/passwd', '../../etc/passwd', '/api/profiles/../../admin',
+    'http://evil.example/', '//evil.example/', '/api/gateway/drain']) {
+    assert.equal(hermes.upstreamUrl(base, evil), null, `must reject ${evil}`);
+  }
+  assert.deepEqual([...hermes.UPSTREAM_PATHS].sort(),
+    ['/api/profiles', '/api/profiles/sessions', '/api/status']);
 });
 
 test('real Hermes backend (when running) is reached through the proxy', async t => {

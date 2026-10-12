@@ -243,6 +243,37 @@ function createServer(options = {}) {
         });
     }
 
+    /* ── Hermes per-agent facts (server-side; upstream session token).
+       Read-only, fixed allowlisted upstream paths, same gate and rate limit
+       as the status proxy. Returns FACTS (sessions, activity ages) — the
+       working/idle vocabulary is derived in the UI from these numbers. ── */
+    if (pathname === '/api/hermes/agents') {
+      if (method !== 'GET') {
+        res.setHeader('Allow', 'GET');
+        return send(res, 405, 'Method not allowed', undefined, method);
+      }
+      const gate = requireAuth(req, res);
+      if (!gate.ok) return;
+      const key = clientKey(req);
+      const limit = cfg.statusLimiter.check(key);
+      if (!limit.allowed) {
+        res.setHeader('Retry-After', String(limit.retryAfterSeconds));
+        return sendJson(res, 429, { error: 'rate_limited' });
+      }
+      return hermesProxy
+        .fetchAgentStates({
+          baseUrl: cfg.hermesBaseUrl,
+          sessionToken: cfg.hermesSessionToken,
+          timeoutMs: cfg.hermesTimeoutMs,
+        })
+        .then(result => {
+          const status = result.ok ? 200
+            : result.state === 'unconfigured' ? 503
+              : result.state === 'error' ? 504 : 502;
+          return sendJson(res, status, result);
+        });
+    }
+
     /* ── authorized diagnostics (no paths, env values or tokens) ── */
     if (pathname === '/api/health/detail') {
       if (method !== 'GET') {

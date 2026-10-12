@@ -100,6 +100,34 @@ function deriveStatuses(status, profiles) {
   return map;
 }
 
+/* Real per-agent facts ({ profile, activeSessions, sessions, ... } from
+ * GET /api/hermes/agents) → { [profile]: statusKey }.
+ *
+ * Evidence rules — nothing is inferred beyond what the backend reports:
+ *   gateway down              → every agent offline (same as deriveStatuses)
+ *   activeSessions > 0        → working  (Hermes stamped is_active itself)
+ *   no active session here,
+ *   but someone else active   → idle
+ *   nobody active             → ready
+ * A crew member Hermes never mentions counts as having no active session —
+ * never as working. gatewayRunning is deliberately NOT used to claim
+ * 'offline': Hermes serves many profiles from one shared gateway, so a false
+ * per-profile flag does not mean that agent is unreachable. */
+function deriveStatusesFromAgents(facts, profiles, status) {
+  const list = Array.isArray(profiles) ? profiles : [];
+  if (!status || status.gateway_running !== true) return deriveStatuses(status, list);
+  const byProfile = new Map();
+  (Array.isArray(facts) ? facts : []).forEach(f => {
+    if (f && typeof f.profile === 'string') byProfile.set(f.profile, f);
+  });
+  const working = new Set(list.filter(p => Number(byProfile.get(p)?.activeSessions) > 0));
+  const map = {};
+  list.forEach(p => {
+    map[p] = working.has(p) ? 'working' : (working.size > 0 ? 'idle' : 'ready');
+  });
+  return map;
+}
+
 /* ── derived roster ────────────────────────────────────────────────── */
 
 /* The right-hand roster is ALWAYS derived from the complete collection:
@@ -164,6 +192,7 @@ const NEXORA_MODEL = {
   roleFor,
   statusInfo,
   deriveStatuses,
+  deriveStatusesFromAgents,
   otherAgents,
   mannequinSVG,
   avatarDataURI,

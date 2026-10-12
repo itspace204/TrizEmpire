@@ -738,6 +738,7 @@ document.getElementById('ws-grid').innerHTML = WORKSPACES.map(ws=>`
 const MODEL = window.NEXORA_MODEL;
 let selectedAgentId = CREW.length ? CREW[0].profile : null;
 let crewStatuses = {};                 // profile -> honest state key
+let crewFacts = null;                  // per-agent facts from /api/hermes/agents (null = unavailable)
 let crewQuery = '';
 const CREW_MSG = {
   working: 'Running — counted active by the gateway.',
@@ -871,14 +872,46 @@ function selectAgent(id, opts = {}){
   if(changed || opts.forceStage) window.CrewStage?.select?.(id);
 }
 
-/* Honest per-agent states from the same backend facts Agent City uses. */
+/* Honest per-agent states. Real per-agent facts (each profile's own active
+   sessions) win when the server has them; otherwise the global backend
+   derivation applies. Nothing is ever claimed that the backend cannot
+   evidence. */
 function applyCrewStatuses(s){
-  crewStatuses = MODEL.deriveStatuses(s, CREW.map(c => c.profile));
+  const profiles = CREW.map(c => c.profile);
+  const facts = (s && crewFacts && crewFacts.ok === true) ? crewFacts.agents : null;
+  crewStatuses = facts
+    ? MODEL.deriveStatusesFromAgents(facts, profiles, s)
+    : MODEL.deriveStatuses(s, profiles);
   window.__crewStatuses = crewStatuses;   // initial paint source for the stage module
   const t = crewNow();
-  CREW.forEach(c => { c.msg = CREW_MSG[crewStatuses[c.profile]] || CREW_MSG.offline; c.time = t; });
+  const byProfile = new Map((facts || []).map(a => [a.profile, a]));
+  CREW.forEach(c => {
+    const key = crewStatuses[c.profile] || 'offline';
+    const f = facts ? byProfile.get(c.profile) : null;
+    c.msg = (f && key !== 'offline') ? perAgentMsg(f, key) : (CREW_MSG[key] || CREW_MSG.offline);
+    c.time = t;
+  });
   renderCrew();
   window.CrewStage?.updateStatus?.(crewStatuses);
+}
+
+/* The real numbers behind an agent's state: active-session count and the age
+   of its most recent activity — Hermes' own timestamps, never estimated. */
+function perAgentMsg(f, key){
+  const age = f.lastActiveAgeSec;
+  const when = (age === null || age === undefined) ? null
+    : age < 60 ? age + 's ago'
+      : age < 3600 ? Math.floor(age / 60) + 'm ago'
+        : age < 86400 ? Math.floor(age / 3600) + 'h ago'
+          : Math.floor(age / 86400) + 'd ago';
+  if(key === 'working'){
+    const n = f.activeSessions;
+    return `${n} active session${n === 1 ? '' : 's'}${when ? ' \u00b7 last activity ' + when : ''}`;
+  }
+  if(when) return `No active session \u00b7 last activity ${when}`;
+  return f.sessions
+    ? `No active session \u00b7 ${f.sessions} stored session${f.sessions === 1 ? '' : 's'}`
+    : 'No sessions recorded for this profile.';
 }
 
 renderCrew();
@@ -1003,16 +1036,37 @@ async function loadHermes(){
   window.__hermesStatus = s;
   window.City3D?.updateStatus?.(s);
   applyCrewStatuses(s);
+  loadAgentStates(s);      /* real per-agent data, when configured upstream */
 }
 
 function markOffline(reason){
   window.City3D?.setOffline?.();
+  crewFacts = null;
   applyCrewStatuses(null);
   const gw = document.querySelector('.hero .gateway');
   gw.childNodes[1].nodeValue = 'BACKEND OFFLINE';
   gw.style.borderColor = 'rgba(150,120,100,.4)'; gw.style.color = 'var(--muted)';
   const chip = document.querySelector('.status-chip');
   chip.childNodes[1].nodeValue = 'System status: ' + (reason || 'Hermes offline');
+}
+
+/* Per-agent facts: /api/hermes/agents proxies the authenticated Hermes
+   endpoints (per-profile sessions with their is_active flag). If the server
+   has no upstream token, or the upstream refuses us, we keep the global
+   derivation already applied — the UI never invents per-agent activity. */
+async function loadAgentStates(status){
+  let body = null;
+  try{
+    const r = await fetch('/api/hermes/agents', {cache:'no-store'});
+    if(r.status === 401){ showLogin(); return; }
+    body = await r.json();
+  }catch{
+    crewFacts = null;
+    applyCrewStatuses(status);
+    return;
+  }
+  crewFacts = (body && body.ok === true) ? body : null;
+  applyCrewStatuses(status);
 }
 
 /* rebuild crew + grid from the real profile list returned by the backend */

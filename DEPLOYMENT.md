@@ -165,6 +165,7 @@ name — never the value — when:
 | `HERMES_BASE_URL` | `http://127.0.0.1:9119` | Server-side upstream for live status. Only the fixed `/api/status` path is ever fetched — it can never become an open proxy. No credentials in the URL. |
 | `HERMES_PUBLIC_URL` | `http://127.0.0.1:9119` | URL handed to browsers for the **local-only** embedded console. Set to empty (`HERMES_PUBLIC_URL=`) on remote deployments. No credentials in the URL. |
 | `HERMES_TIMEOUT_MS` | `3000` | Per-attempt upstream timeout (one retry on network errors). |
+| `HERMES_SESSION_TOKEN` | unset | Upstream session token for the authenticated per-agent endpoints (`/api/profiles*`). Sent as `X-Hermes-Session-Token`, only to the fixed allowlisted upstream paths, never to browsers. Empty = per-agent crew data disabled (the endpoint reports `unconfigured` and the UI keeps global signals). |
 
 ### Creating password hashes
 
@@ -272,6 +273,47 @@ browser ── same-origin ──▶ TrizEmpire server ── HERMES_BASE_URL �
   Set `HERMES_PUBLIC_URL=` for remote deployments; the UI then shows an honest
   "console unavailable" panel instead of a broken frame.
 
+### Per-agent crew states (authenticated upstream)
+
+`GET /api/hermes/agents` returns **facts** for every Hermes profile — session
+count, active-session count, and the age of the most recent activity — and the
+Crew view derives working/idle/ready from those numbers instead of the global
+`active_agents` counter:
+
+```
+browser ── same-origin ──▶ TrizEmpire /api/hermes/agents
+                              │  X-Hermes-Session-Token (server-side only)
+                              ├──▶ Hermes /api/profiles          (per-profile facts)
+                              └──▶ Hermes /api/profiles/sessions (is_active, 300s window)
+```
+
+Hermes keeps `/api/profiles*` off its public path list (only `/api/status` and
+`/api/health` are credential-free), so both sides need the same token:
+
+```sh
+# 1. On the Hermes machine, pin the dashboard session token:
+HERMES_DASHBOARD_SESSION_TOKEN='generate-a-long-random-value' hermes dashboard
+# 2. Repeat that exact value in nexora/.env:
+#    HERMES_SESSION_TOKEN=generate-a-long-random-value
+# 3. Restart TrizEmpire and reload the Crew view.
+```
+
+Notes and limits — all reported honestly by the endpoint rather than hidden:
+
+- The `active` flag is **Hermes' own** 300-second `is_active` stamp on each
+  session; TrizEmpire does not re-invent the window (`activeWindowSec` is
+  returned so the UI can label it).
+- `state: 'unconfigured'` (HTTP 503) — `HERMES_SESSION_TOKEN` is empty; the
+  server does not probe the upstream at all.
+- `state: 'unauthorized'` (HTTP 502) — the upstream rejected the token
+  (wrong/expired value, or an **OAuth-gated** dashboard, which only accepts
+  cookie logins this server does not perform). This is reported separately
+  from `disconnected`: it is a credential problem, not a connectivity one.
+- Without per-agent data the Crew view keeps the global derivation from
+  `/api/status` — no per-agent activity is ever fabricated.
+- The token is validated at startup (no line breaks, ≤ 512 chars) and errors
+  name the variable without echoing the value.
+
 ## Logging and health checks
 
 - Access log: method + pathname + timestamp only (never query strings, bodies,
@@ -334,10 +376,13 @@ to `main` and every pull request.
   (cockpit, crew command center, 3D Agent City, local console embed), 63
   automated tests including the deployment-bundle checks and a real-Hermes
   integration test that skips when Hermes is not running.
-- **Partially implemented:** per-agent working/idle coloring derives from
-  global backend signals (`gateway_running`, `active_agents`); Hermes'
-  per-profile endpoints require upstream credentials that are not configured.
-  Rate limiting and sessions are per-process (not shared across replicas).
+- **Partially implemented:** per-agent working/idle coloring uses real
+  per-profile session data **when** `HERMES_SESSION_TOKEN` is configured (see
+  [Per-agent crew states](#per-agent-crew-states-authenticated-upstream));
+  without it — or behind an OAuth-gated Hermes dashboard, which only accepts
+  cookie logins — the UI falls back to the global backend signals
+  (`gateway_running`, `active_agents`) and says so. Rate limiting and
+  sessions are per-process (not shared across replicas).
   The systemd unit and nginx snippet are committed as a bundle but are
   validated structurally by tests, not by `systemd-analyze verify`/`nginx -t`
   in CI — run both on the target host as shown above.

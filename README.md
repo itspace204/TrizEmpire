@@ -68,7 +68,8 @@ All via environment variables — template in [nexora/.env.example](nexora/.env.
 
 - `HOST` defaults to `127.0.0.1`; non-loopback binds require `ALLOW_REMOTE_HOST=true` **and** configured auth.
 - `NODE_ENV=production` requires `TRIZ_ADMIN_PASSWORD_HASH` and a fixed `PORT` — the server refuses to start otherwise.
-- `HERMES_BASE_URL` — server-side upstream (fixed `/api/status` path only; never an open proxy).
+- `HERMES_BASE_URL` — server-side upstream (fixed allowlisted paths only; never an open proxy).
+- `HERMES_SESSION_TOKEN` — upstream session token that unlocks real per-agent crew states (per-profile sessions from Hermes); unset = the crew shows global signals and the endpoint reports `unconfigured`.
 - `HERMES_PUBLIC_URL` — console-embed URL for the operator's own machine; set empty on remote deployments (the UI then shows an unavailable panel).
 - `NODE_ENV=production` — `Secure` session cookies.
 

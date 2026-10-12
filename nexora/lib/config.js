@@ -159,6 +159,21 @@ function resolveConfig(options = {}, env = process.env) {
     throw new Error('HERMES_TIMEOUT_MS must be a positive integer (milliseconds).');
   }
 
+  /* Upstream session token for the authenticated per-agent endpoints
+   * (Hermes' X-Hermes-Session-Token, minted as HERMES_DASHBOARD_SESSION_TOKEN
+   * on the Hermes side). Optional: without it per-agent facts are reported
+   * as unconfigured and the UI keeps the global derivation. It is a secret —
+   * validation errors name the variable and never echo the value, and it is
+   * only ever sent to the fixed allowlisted upstream paths. */
+  const hermesSessionToken = options.hermesSessionToken !== undefined ? String(options.hermesSessionToken)
+    : String(env.HERMES_SESSION_TOKEN || '');
+  if (hermesSessionToken && /[\r\n]/.test(hermesSessionToken)) {
+    throw new Error('HERMES_SESSION_TOKEN must not contain line breaks (it is sent as an HTTP header).');
+  }
+  if (hermesSessionToken.length > 512) {
+    throw new Error('HERMES_SESSION_TOKEN is too long (maximum 512 characters).');
+  }
+
   return {
     root: options.root || path.resolve(__dirname, '..'),
     host,
@@ -175,6 +190,7 @@ function resolveConfig(options = {}, env = process.env) {
     hermesBaseUrl,
     hermesPublicUrl,
     hermesTimeoutMs,
+    hermesSessionToken,
   };
 }
 
