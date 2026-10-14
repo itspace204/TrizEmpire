@@ -31,5 +31,23 @@ const { createServer } = require('../trizempire/server');
 const server = createServer();
 
 module.exports = (req, res) => {
+  /* Vercel rewrites internally route the request to /api/index. Carry the
+   * source pathname in a reserved query parameter so this shared server sees
+   * the real route (/, /crew/..., /api/...) regardless of whether the
+   * platform exposes the source or destination URL as req.url. */
+  try {
+    const routed = new URL(req.url || '/', 'http://vercel.internal');
+    const originalPath = routed.searchParams.get('__triz_vc_original_path');
+    if (originalPath && originalPath.startsWith('/')
+      && !originalPath.startsWith('//')
+      && !originalPath.includes('\\')
+      && !/[\\r\\n?#]/.test(originalPath)) {
+      routed.searchParams.delete('__triz_vc_original_path');
+      const query = routed.searchParams.toString();
+      req.url = originalPath + (query ? `?${query}` : '');
+    }
+  } catch {
+    // Invalid URL shapes fall through to the server's normal safe 404 path.
+  }
   server.emit('request', req, res);
 };
