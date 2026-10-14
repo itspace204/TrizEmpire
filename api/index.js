@@ -41,7 +41,7 @@ module.exports = (req, res) => {
     if (originalPath && originalPath.startsWith('/')
       && !originalPath.startsWith('//')
       && !originalPath.includes('\\')
-      && !/[\\r\\n?#]/.test(originalPath)) {
+      && !/[\r\n?#]/.test(originalPath)) {
       routed.searchParams.delete('__triz_vc_original_path');
       const query = routed.searchParams.toString();
       req.url = originalPath + (query ? `?${query}` : '');
