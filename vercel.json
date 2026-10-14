@@ -5,11 +5,7 @@
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": [
-        "trizempire/index.html",
-        "trizempire/crew/**",
-        "trizempire/vendor/**"
-      ],
+      "includeFiles": "trizempire/**",
       "maxDuration": 30
     }
   }
