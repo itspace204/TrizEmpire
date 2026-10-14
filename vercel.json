@@ -1,15 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index?__triz_vc_original_path=/$1" }
+    {
+      "source": "/(.*)",
+      "destination": "/api/index?__triz_vc_original_path=/$1"
+    }
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": [
-        "trizempire/index.html",
-        "trizempire/crew/**",
-        "trizempire/vendor/**"
-      ],
+      "includeFiles": "trizempire/**",
       "maxDuration": 30
     }
   }
