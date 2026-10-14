@@ -384,9 +384,8 @@ test('vercel.json routes everything to the entry and bundles what it reads', () 
   assert.deepEqual(config.rewrites, [{ source: '/(.*)', 'destination': '/api/index?__triz_vc_original_path=/$1' }]);
   const fn = config.functions['api/index.js'];
   assert.ok(fn, 'the entry must be declared as a function');
-  assert.ok(fn.includeFiles.includes('trizempire/index.html'));
-  assert.ok(fn.includeFiles.includes('trizempire/crew/**'));
-  assert.ok(fn.includeFiles.includes('trizempire/vendor/**'));
+  assert.equal(fn.includeFiles, 'trizempire/**',
+    'Vercel requires includeFiles to be a single glob string covering the app assets');
   assert.ok(Number.isInteger(fn.maxDuration) && fn.maxDuration > 0);
 });
 
