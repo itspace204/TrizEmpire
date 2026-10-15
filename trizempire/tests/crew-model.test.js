@@ -236,3 +236,66 @@ test('workspaceForProfile resolves assigned profiles and returns null otherwise'
     'order follows the operator\'s list');
   assert.deepEqual(model.withAssignments(null, {}), [], 'a non-list base yields nothing');
 });
+
+/* ── building activity in the Agent City (glow + pulse) ────────────── */
+
+/* Two channels, two kinds of evidence: heat is how busy or how recently
+ * busy, beat is what is running RIGHT NOW. These pin that split, and that
+ * missing evidence never turns into invented activity. */
+
+test('activityFor: no facts at all means no activity', () => {
+  assert.deepEqual(model.activityFor(null), { heat: 0, beat: 0 });
+  assert.deepEqual(model.activityFor(undefined), { heat: 0, beat: 0 });
+  assert.deepEqual(model.activityFor('nonsense'), { heat: 0, beat: 0 });
+});
+
+test('activityFor: a null timestamp is no evidence, never "just now"', () => {
+  // Hermes reports null for a profile whose sessions carry no usable time.
+  const none = model.activityFor({ profile: 'data', activeSessions: 0, sessions: 0, lastActiveAgeSec: null });
+  assert.deepEqual(none, { heat: 0, beat: 0 }, 'an untouched building must stay flat');
+});
+
+test('activityFor: concurrency drives the pulse, and only concurrency does', () => {
+  const beatOf = n => model.activityFor({ activeSessions: n, lastActiveAgeSec: 1e6 }).beat;
+  assert.equal(beatOf(0), 0, 'nothing running: no pulse, however recently it worked');
+  assert.equal(beatOf(1), 2600);
+  assert.equal(beatOf(2), 2120);
+  assert.equal(beatOf(4), 1160, 'flat out');
+  assert.equal(beatOf(9), 1160, 'more than flat out cannot be faster');
+  assert.ok(beatOf(3) > beatOf(4) && beatOf(3) < beatOf(2), 'monotonic between the ends');
+});
+
+test('activityFor: running sessions outweigh mere warmth', () => {
+  const recent = model.activityFor({ activeSessions: 0, lastActiveAgeSec: 60 });
+  const running = model.activityFor({ activeSessions: 3, lastActiveAgeSec: 60 });
+  assert.ok(recent.heat > 0 && recent.beat === 0, 'a building that just worked is warm but still');
+  assert.equal(running.heat, .75, 'load 3 of 4');
+  assert.ok(running.heat > recent.heat);
+});
+
+test('activityFor: warmth cools to nothing on its own ramp', () => {
+  const heat = age => model.activityFor({ activeSessions: 0, lastActiveAgeSec: age }).heat;
+  assert.ok(heat(0) > heat(600), 'cooling');
+  assert.ok(heat(600) > heat(1500));
+  assert.equal(heat(1800), 0, 'half an hour later it is done');
+  assert.equal(heat(10800), 0, 'and stays done');
+  assert.equal(heat(0), .6, 'fresh warmth alone tops out below a running session');
+});
+
+test('activityFor: junk numbers can neither brighten nor darken wrongly', () => {
+  // A negative concurrency and a timestamp in the future are clock skew and
+  // nonsense respectively — both are refused, not clamped into activity.
+  assert.deepEqual(model.activityFor({ activeSessions: -5, lastActiveAgeSec: -5 }), { heat: 0, beat: 0 });
+  assert.deepEqual(model.activityFor({ activeSessions: 'x', lastActiveAgeSec: 'x' }), { heat: 0, beat: 0 });
+  assert.deepEqual(model.activityFor({ activeSessions: NaN, lastActiveAgeSec: Infinity }), { heat: 0, beat: 0 });
+  const many = model.activityFor({ activeSessions: 99, lastActiveAgeSec: 0 });
+  assert.equal(many.heat, 1, 'heat is capped at 1');
+  assert.equal(many.beat, 1160);
+});
+
+test('activityFor never mutates the fact it is given', () => {
+  const fact = { profile: 'writer', activeSessions: 2, sessions: 7, lastActiveAgeSec: 30 };
+  const before = JSON.stringify(fact);
+  model.activityFor(fact);
+  assert.equal(JSON.stringify(fact), before);
+});

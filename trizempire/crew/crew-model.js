@@ -128,6 +128,42 @@ function deriveStatusesFromAgents(facts, profiles, status) {
   return map;
 }
 
+/* ── how busy a building looks in the Agent City ──────────────────── */
+
+/* Real per-agent facts → the two visual channels of a building:
+ *
+ *   heat ← the strongest evidence of work, either
+ *            load  = activeSessions (Hermes' own is_active flag), or
+ *            warmth = how recently this profile last touched a session,
+ *                     cooling linearly to nothing after COOL_SEC.
+ *   beat ← activeSessions only: how fast the building pulses. Zero when
+ *          nothing is running, so a building that merely worked recently is
+ *          warm but still — "working" and "worked" must not look alike.
+ *
+ * A profile the backend says nothing about gets NO facts at all and both
+ * channels stay zero: the building looks exactly as it did before this
+ * existed. lastActiveAgeSec of null is "no usable timestamp" — never "just
+ * now" (Number(null) is 0, which would light every untouched building as
+ * freshly active). Nothing is interpolated, averaged or assumed. */
+const ACTIVITY_COOL_SEC = 1800;   // warmth reaches zero half an hour after the last activity
+const ACTIVITY_TICK_MAX = 4;      // concurrent sessions that read as flat out
+const ACTIVITY_BEAT_SLOW = 2600, ACTIVITY_BEAT_FAST = 1160;
+
+function activityFor(fact) {
+  if (!fact || typeof fact !== 'object') return { heat: 0, beat: 0 };
+  const active = Math.max(0, Number(fact.activeSessions) || 0);
+  const age = typeof fact.lastActiveAgeSec === 'number' && Number.isFinite(fact.lastActiveAgeSec)
+    && fact.lastActiveAgeSec >= 0 ? fact.lastActiveAgeSec : null;
+  const load = Math.min(active, ACTIVITY_TICK_MAX) / ACTIVITY_TICK_MAX;
+  const warmth = age === null ? 0 : Math.max(0, 1 - age / ACTIVITY_COOL_SEC) * .6;
+  const beat = active > 0
+    ? Math.round(ACTIVITY_BEAT_SLOW
+      - (Math.min(active, ACTIVITY_TICK_MAX) - 1) * (ACTIVITY_BEAT_SLOW - ACTIVITY_BEAT_FAST)
+        / (ACTIVITY_TICK_MAX - 1))
+    : 0;
+  return { heat: +Math.max(load, warmth).toFixed(3), beat };
+}
+
 /* ── isolated workspaces (cockpit cards) ──────────────────────────── */
 
 /* The cockpit's ISOLATED WORKSPACES cards are an organizational view over
@@ -249,6 +285,7 @@ const NEXORA_MODEL = {
   statusInfo,
   deriveStatuses,
   deriveStatusesFromAgents,
+  activityFor,
   agentsInWorkspace,
   workspaceForProfile,
   withAssignments,

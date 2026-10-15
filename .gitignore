@@ -28,7 +28,9 @@ logs/
 .DS_Store
 Thumbs.db
 .vscode/
-.idea/# Local agent / tool state
+.idea/
+
+# Local agent / tool state
 .freebuff/
 
 # Operator runtime state (workspace assignment mapping written by the server)
@@ -37,4 +39,9 @@ data/
 
 # Vercel CLI link/state (never contains secrets, never commit it)
 .vercel/
+
+# Scratch assets from the Agent City / Crew / Voice reference-frame pipelines
+.city-tmp/
+.crew-tmp/
+.voice-tmp/
 
