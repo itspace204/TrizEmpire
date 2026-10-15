@@ -1,0 +1,5 @@
+# tests/deploy.test.js asserts the systemd unit and nginx config are LF-only,
+# and both are consumed by Linux tooling at deploy time. Pin them regardless
+# of the cloning machine's core.autocrlf so a fresh Windows checkout passes
+# the deployment checks (they failed with CRLF before this file existed).
+deploy/** text eol=lf
