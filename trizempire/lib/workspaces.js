@@ -28,6 +28,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const MODEL = require('../crew/crew-model');
+const { neonQuery } = require('./neon');
 
 /* Generous bounds: the real crew is five profiles across four workspaces.
  * The limits exist to bound a bad payload, not to describe reality. */
@@ -114,9 +115,105 @@ async function saveAssignmentsKv(kv, assignments, { fetchImpl } = {}) {
   return { ok: true, assignments: result.assignments };
 }
 
-/* Backend-neutral store: picks KV when configured, else the local file.
- * load()/save() share one shape so server.js does not care which it got. */
+/* ── Neon (serverless Postgres) store ─────────────────────────────────────
+ * The same JSON document the other backends write, kept in one settings row
+ * (key/value) so the table stays useful for future settings instead of being
+ * a single-purpose blob. The table is created on first use — controlled,
+ * server-side, with a fixed statement; no migration tool and no DDL built
+ * from request data. Reads never throw: unreachable/error states come back
+ * as an honest error with the shipped defaults applying, exactly like the
+ * file and KV backends. Uses lib/neon.js (global fetch, no SDK, no dep). */
+const NEON_KEY = 'trizempire:workspaces';
+const NEON_TABLE = 'trizempire_settings';
+const NEON_CREATE_TABLE = `CREATE TABLE IF NOT EXISTS ${NEON_TABLE} (
+  key text PRIMARY KEY,
+  value jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+)`;
+
+function neonRunOptions(options) {
+  return { fetchImpl: options.neonFetchImpl, timeoutMs: options.neonTimeoutMs };
+}
+
+async function loadAssignmentsNeon(neon, options = {}) {
+  const run = options.neonQueryImpl || neonQuery;
+  const select = `SELECT value FROM ${NEON_TABLE} WHERE key = $1`;
+  const opts = neonRunOptions(options);
+  let result;
+  try {
+    result = await run(neon.dsn, select, [NEON_KEY], opts);
+  } catch (error) {
+    if (!error || error.code !== '42P01') {
+      return {
+        assignments: null,
+        source: 'defaults',
+        error: `workspace database unreachable (${(error && error.code) || 'error'}); defaults apply`,
+      };
+    }
+    // Table absent (fresh database): create it server-side, then retry once.
+    try {
+      await run(neon.dsn, NEON_CREATE_TABLE, [], opts);
+      result = await run(neon.dsn, select, [NEON_KEY], opts);
+    } catch (retryError) {
+      return {
+        assignments: null,
+        source: 'defaults',
+        error: `workspace database unreachable (${(retryError && retryError.code) || 'error'}); defaults apply`,
+      };
+    }
+  }
+  const row = result && Array.isArray(result.rows) ? result.rows[0] : null;
+  if (!row || row.value === null || row.value === undefined || row.value === '') {
+    return { assignments: null, source: 'defaults', error: null };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(typeof row.value === 'string' ? row.value : JSON.stringify(row.value));
+  } catch {
+    return { assignments: null, source: 'defaults', error: 'stored workspace value is not valid JSON; defaults apply' };
+  }
+  const validated = validateAssignments(parsed && parsed.assignments);
+  if (!validated.ok) {
+    return { assignments: null, source: 'defaults', error: `stored workspace value rejected: ${validated.error}; defaults apply` };
+  }
+  return { assignments: validated.assignments, source: 'stored', error: null };
+}
+
+async function saveAssignmentsNeon(neon, assignments, options = {}) {
+  // Validation first: a rejected mapping must never reach the database.
+  const result = validateAssignments(assignments);
+  if (!result.ok) return result;
+  const run = options.neonQueryImpl || neonQuery;
+  const opts = neonRunOptions(options);
+  const document = JSON.stringify({ version: 1, assignments: result.assignments });
+  const upsert = `INSERT INTO ${NEON_TABLE} (key, value) VALUES ($1, $2::jsonb) `
+    + 'ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()';
+  try {
+    await run(neon.dsn, upsert, [NEON_KEY, document], opts);
+  } catch (error) {
+    if (!error || error.code !== '42P01') {
+      return { ok: false, error: `workspace database unreachable (${(error && error.code) || 'error'}); nothing was saved` };
+    }
+    try {
+      await run(neon.dsn, NEON_CREATE_TABLE, [], opts);
+      await run(neon.dsn, upsert, [NEON_KEY, document], opts);
+    } catch (retryError) {
+      return { ok: false, error: `workspace database unreachable (${(retryError && retryError.code) || 'error'}); nothing was saved` };
+    }
+  }
+  return { ok: true, assignments: result.assignments };
+}
+
+/* Backend-neutral store: picks Neon when configured, else KV, else the local
+ * file. load()/save() share one shape so server.js does not care which it got. */
 function createStore(config) {
+  if (config && config.neon && config.neon.dsn) {
+    return {
+      backend: 'neon',
+      load: () => loadAssignmentsNeon(config.neon, config),
+      save: assignments => saveAssignmentsNeon(config.neon, assignments, config),
+    };
+  }
   if (config && config.kv && config.kv.url && config.kv.token) {
     return {
       backend: 'kv',
@@ -222,6 +319,10 @@ module.exports = {
   validateAssignments,
   loadAssignmentsKv,
   saveAssignmentsKv,
+  loadAssignmentsNeon,
+  saveAssignmentsNeon,
   createStore,
   KV_KEY,
+  NEON_KEY,
+  NEON_TABLE,
 };

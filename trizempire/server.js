@@ -112,12 +112,17 @@ function resolveOptions(options = {}, env = process.env) {
      the platform's fetch. */
   cfg.supabaseFetch = options.supabaseFetch || undefined;
   cfg.statusLimiter = options.statusLimiter || new RateLimiter({ max: 120, windowMs: 60 * 1000 });
-  /* Workspace mapping store: Upstash-compatible KV when configured
-     (serverless hosts), else the local JSON file. */
+  /* Workspace mapping store: Neon (serverless Postgres) when configured,
+     else an Upstash-compatible KV store, else the local JSON file. */
   cfg.workspacesStore = options.workspacesStore || workspacesLib.createStore({
     file: cfg.workspacesFile,
-    kv: (cfg.workspacesKvUrl && cfg.workspacesKvToken)      ? { url: cfg.workspacesKvUrl, token: cfg.workspacesKvToken }
+    kv: (cfg.workspacesKvUrl && cfg.workspacesKvToken)
+      ? { url: cfg.workspacesKvUrl, token: cfg.workspacesKvToken }
       : null,
+    neon: cfg.neon,
+    // Test seam: production always uses the platform's fetch.
+    neonFetchImpl: options.neonFetch,
+    neonQueryImpl: options.neonQuery,
   });
   delete cfg.sessionIdleMs;
   delete cfg.sessionAbsoluteMs;

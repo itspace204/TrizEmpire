@@ -135,6 +135,38 @@ function readSupabaseConfig(env) {
   return { url: url.replace(/\/+$/, ''), key, role };
 }
 
+/* Neon (serverless Postgres) — OPTIONAL durable storage for the workspace
+ * mapping. NEON_DATABASE_URL is preferred; DATABASE_URL (the name the Vercel
+ * Marketplace integration injects) works too. The value is a full connection
+ * string containing a password: validation names the variable and never
+ * echoes the value. Returns null when unconfigured (file/KV stores apply). */
+function readNeonConfig(env) {
+  const name = (env.NEON_DATABASE_URL !== undefined && env.NEON_DATABASE_URL !== '')
+    ? 'NEON_DATABASE_URL'
+    : ((env.DATABASE_URL !== undefined && env.DATABASE_URL !== '') ? 'DATABASE_URL' : null);
+  if (!name) return null;
+  const dsn = readSecretVar(env, name, { maxLength: 4096 });
+  let url;
+  try {
+    url = new URL(dsn);
+  } catch {
+    throw new Error(`${name} must be a postgres:// connection string (Neon console → Connection string).`);
+  }
+  if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') {
+    throw new Error(`${name} must use the postgres:// or postgresql:// scheme.`);
+  }
+  if (!url.username || !url.password) {
+    throw new Error(`${name} must include a user and a password (Neon console → Connection string).`);
+  }
+  if (!url.hostname) {
+    throw new Error(`${name} must include a database host (Neon console → Connection string).`);
+  }
+  if (!url.pathname || url.pathname.length < 2) {
+    throw new Error(`${name} must include a database name after the host.`);
+  }
+  return { dsn };
+}
+
 function readHashVar(env, name) {
   const raw = env[name];
   if (raw === undefined || raw === '') return null;
@@ -167,6 +199,7 @@ function resolveConfig(options = {}, env = process.env) {
    * configured: production must never boot unauthenticated, and Supabase
    * counts as authentication. */
   const supabase = options.supabase !== undefined ? options.supabase : readSupabaseConfig(env);
+  const neon = options.neon !== undefined ? options.neon : readNeonConfig(env);
   const authRequired = users.length > 0 || !!supabase;
   const remoteAllowed = env.ALLOW_REMOTE_HOST === 'true' || options.allowRemoteHost === true;
   if (!LOOPBACK_HOSTS.has(host)) {
@@ -296,6 +329,7 @@ function resolveConfig(options = {}, env = process.env) {
     port,
     users,
     supabase: supabase || null,
+    neon: neon || null,
     authRequired,
     secureCookies: options.secureCookies !== undefined ? options.secureCookies
       : (isProduction || env.TRIZ_SECURE_COOKIE === 'true'),
@@ -327,4 +361,4 @@ function usersFromEnvValidated(env) {
   return users;
 }
 
-module.exports = { loadEnvFile, resolveConfig, readSupabaseConfig };
+module.exports = { loadEnvFile, resolveConfig, readSupabaseConfig, readNeonConfig };

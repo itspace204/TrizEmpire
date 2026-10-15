@@ -279,6 +279,8 @@ name — never the value — when:
 - A `TRIZ_*_PASSWORD_HASH` value is not a valid scrypt hash.
 - `SUPABASE_URL` without `SUPABASE_ANON_KEY` (or the reverse), or an
   invalid `TRIZ_SUPABASE_ROLE`.
+- `NEON_DATABASE_URL` / `DATABASE_URL` that is not a `postgres://` URL with a
+  user, password and database name.
 - `HERMES_BASE_URL` / `HERMES_PUBLIC_URL` are not valid http(s) URLs, or
   contain embedded credentials (`user:pass@`) — the proxy has no
   upstream-auth support and URLs are handed to browsers, so secrets must not
@@ -307,6 +309,7 @@ name — never the value — when:
 | `HERMES_SESSION_TOKEN` | unset | Upstream session token for the authenticated per-agent endpoints (`/api/profiles*`). Sent as `X-Hermes-Session-Token`, only to the fixed allowlisted upstream paths, never to browsers. Empty = per-agent crew data disabled (the endpoint reports `unconfigured` and the UI keeps global signals). |
 | `TRIZ_WORKSPACES_FILE` | `data/workspaces.json` (under the app directory; `/tmp` on Vercel) | Where the operator's workspace→agent mapping (saved from the cockpit's ＋ ASSIGN panel) is persisted. Relative paths resolve against the app directory. On systemd the app tree is read-only (`ProtectSystem=strict`); the unit's `ReadWritePaths=` opens the default `data/` directory — create it owned by the service user before first start. |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | unset | Upstash-compatible Redis REST store for the workspace mapping — **required for durable mapping on serverless hosts** (the lambda filesystem is read-only). The `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` pair works too. Both halves must be set together; when configured, KV takes precedence over the file store. |
+| `NEON_DATABASE_URL` (or `DATABASE_URL`) | unset | Neon **serverless Postgres** connection string (`postgres://user:pass@host/db?sslmode=require`) — the same workspace mapping stored as one `jsonb` row in a `trizempire_settings` table that this server creates on first use. Takes precedence over KV and the file store (**Neon > KV > file**). All SQL is parameterized, sent over Neon's HTTPS endpoint with the built-in `fetch`, so the project still has **zero npm dependencies**. The DSN contains the database password: keep it in your secret store only, and note that the connecting role should not be the broader `neon_superuser` if you can avoid it. |
 | `TRIZ_TRUST_PROXY` | unset (`true` automatically when `VERCEL=1`) | Trust `X-Real-IP`/`X-Forwarded-For` for rate-limit bucketing. Enable only behind a reverse proxy **you** control — on a directly-exposed server it lets clients spoof their IP. |
 
 ### Creating password hashes
