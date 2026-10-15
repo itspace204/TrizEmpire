@@ -13,11 +13,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
+const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { StatelessSessionStore } = require('../lib/auth');
+const { StatelessSessionStore, hashPassword } = require('../lib/auth');
 const { resolveConfig } = require('../lib/config');
 const workspaces = require('../lib/workspaces');
 const { createServer } = require('../server');
@@ -445,4 +446,111 @@ test('root package.json pins CommonJS and a Vercel-capable Node', () => {
   // must not advertise it. The app in trizempire/ still supports 20.
   const major = Number(pkg.engines.node.replace(/[^\d]/g, '').slice(0, 2));
   assert.ok(major >= 22, `engines.node must be >=22 for new Vercel functions, got ${pkg.engines.node}`);
+});
+
+/* ── production cold start: the Vercel runtime environment ──────────── */
+
+/* The platform invokes the entry with NODE_ENV=production, no PORT and a
+ * read-only tree. The config resolves at require time, so each case runs in
+ * a fresh child process with an explicitly built environment — ambient
+ * variables (including a developer's PORT/NODE_ENV) must never leak in. */
+const PRODUCTION_STRIP = [
+  'NODE_ENV', 'PORT', 'HOST', 'VERCEL', 'ALLOW_REMOTE_HOST',
+  'TRIZ_ADMIN_PASSWORD_HASH', 'TRIZ_OPERATOR_PASSWORD_HASH', 'TRIZ_SESSION_SECRET',
+  'TRIZ_AUTH_USERS', 'TRIZ_SECURE_COOKIE', 'TRIZ_TRUST_PROXY', 'TRIZ_WORKSPACES_FILE',
+  'TRIZ_SESSION_TTL_MINUTES', 'TRIZ_SESSION_ABS_MINUTES',
+  'KV_REST_API_URL', 'KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN',
+  'HERMES_BASE_URL', 'HERMES_PUBLIC_URL', 'HERMES_SESSION_TOKEN', 'HERMES_TIMEOUT_MS',
+];
+
+const ENTRY = path.resolve(repoRoot, 'api', 'index.js');
+const E2E_PASSWORD = 'correct-horse-battery-staple';
+
+function productionEnv(overrides = {}) {
+  const env = { ...process.env };
+  for (const name of PRODUCTION_STRIP) delete env[name];
+  return Object.assign(env, overrides);
+}
+
+function coldStart(overrides, source) {
+  const res = spawnSync(process.execPath, ['-e', source], {
+    env: productionEnv(overrides),
+    encoding: 'utf8',
+    timeout: 30000,
+    cwd: repoRoot,
+  });
+  return { status: res.status, out: `${res.stdout || ''}${res.stderr || ''}` };
+}
+
+const LOAD_PROBE = `try { require(${JSON.stringify(ENTRY)}); console.log('LOADED'); } catch (e) { console.log('THREW: ' + e.message); }`;
+
+test('production cold start fails fast and names the offending variable', () => {
+  // The live-deployment failure class: a production instance without a
+  // password must refuse to start, and the error must NAME the variable to
+  // set (there is no default password).
+  let r = coldStart({ NODE_ENV: 'production' }, LOAD_PROBE);
+  assert.match(r.out, /TRIZ_ADMIN_PASSWORD_HASH/, 'the error must name the missing variable');
+  assert.doesNotMatch(r.out, /LOADED/, 'a production instance without a password must never start');
+
+  // A mistyped NODE_ENV from the dashboard names the allowed values.
+  r = coldStart({ NODE_ENV: 'Production' }, LOAD_PROBE);
+  assert.match(r.out, /NODE_ENV must be one of/);
+
+  // A non-scrypt secret pasted into the dashboard is rejected by name,
+  // without echoing the (possibly real) value back.
+  r = coldStart({ NODE_ENV: 'production', TRIZ_ADMIN_PASSWORD_HASH: 'hunter2' }, LOAD_PROBE);
+  assert.match(r.out, /TRIZ_ADMIN_PASSWORD_HASH is not a valid scrypt hash/);
+  assert.doesNotMatch(r.out, /hunter2/, 'the invalid secret must never be echoed');
+});
+
+test('production serverless entry serves the full app end-to-end', () => {
+  const source = `
+    const http = require('node:http');
+    const handler = require(${JSON.stringify(ENTRY)});
+    const server = http.createServer(handler);
+    const timer = setTimeout(() => { console.log('RESULT:' + JSON.stringify({ error: 'timeout' })); process.exit(3); }, 20000);
+    server.listen(0, '127.0.0.1', async () => {
+      const base = 'http://127.0.0.1:' + server.address().port;
+      const out = {};
+      try {
+        let r = await fetch(base + '/api/index?__triz_vc_original_path=%2F');
+        out.rewrittenRoot = [r.status, /TrizEmpire/.test(await r.text())];
+        r = await fetch(base + '/healthz');
+        out.health = r.status;
+        r = await fetch(base + '/api/workspaces');
+        out.unauthenticated = r.status;
+        r = await fetch(base + '/api/auth/login', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', origin: base },
+          body: JSON.stringify({ username: 'admin', password: ${JSON.stringify(E2E_PASSWORD)} }),
+        });
+        out.login = r.status;
+        const cookie = (r.headers.get('set-cookie') || '').match(/triz_session=[^;]+/);
+        if (cookie) {
+          r = await fetch(base + '/api/workspaces', { headers: { cookie: cookie[0] } });
+          out.authenticated = r.status;
+        }
+      } catch (e) {
+        out.error = String((e && e.message) || e);
+      }
+      clearTimeout(timer);
+      console.log('RESULT:' + JSON.stringify(out));
+      process.exit(out.error ? 1 : 0);
+    });
+  `;
+  const r = coldStart({
+    NODE_ENV: 'production',
+    VERCEL: '1',
+    TRIZ_ADMIN_PASSWORD_HASH: hashPassword(E2E_PASSWORD),
+    TRIZ_SESSION_SECRET: 'v'.repeat(32),
+    HERMES_BASE_URL: 'http://127.0.0.1:9',
+  }, source);
+  const line = (r.out.split('\n').find((l) => l.startsWith('RESULT:')) || '').slice(7);
+  assert.ok(line, `child produced no result (status=${r.status}): ${r.out}`);
+  const out = JSON.parse(line);
+  assert.deepEqual(out.rewrittenRoot, [200, true], 'the rewritten path restores and serves the page');
+  assert.equal(out.health, 200, 'healthz answers');
+  assert.equal(out.unauthenticated, 401, 'production enforces auth on the API');
+  assert.equal(out.login, 200, 'the configured scrypt hash accepts the password');
+  assert.equal(out.authenticated, 200, 'the stateless session cookie authorizes the next call');
 });
