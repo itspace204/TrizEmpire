@@ -381,12 +381,11 @@ test('vendored and model assets are cacheable, index.html is not', async () => {
 
 test('vercel.json routes everything to the entry and bundles what it reads', () => {
   const config = JSON.parse(fs.readFileSync(path.join(repoRoot, 'vercel.json'), 'utf8'));
-  assert.deepEqual(config.rewrites, [{ source: '/(.*)', 'destination': '/api/index' }]);
+  assert.deepEqual(config.rewrites, [{ source: '/(.*)', 'destination': '/api/index?__triz_vc_original_path=/$1' }]);
   const fn = config.functions['api/index.js'];
   assert.ok(fn, 'the entry must be declared as a function');
-  assert.ok(fn.includeFiles.includes('trizempire/index.html'));
-  assert.ok(fn.includeFiles.includes('trizempire/crew/**'));
-  assert.ok(fn.includeFiles.includes('trizempire/vendor/**'));
+  assert.equal(fn.includeFiles, 'trizempire/**',
+    'Vercel requires includeFiles to be a single glob string covering the app assets');
   assert.ok(Number.isInteger(fn.maxDuration) && fn.maxDuration > 0);
 });
 
@@ -415,6 +414,17 @@ test('api/index.js exports a handler that serves the full app', async t => {
     assert.equal(index.status, 200);
     assert.match(index.headers.get('content-type'), /text\/html/);
     assert.match(await index.text(), /TrizEmpire/);
+
+    // Simulate Vercel invoking the rewritten destination URL rather than the
+    // browser's original URL. The entry must restore the source path.
+    const rewrittenRoot = await fetch(`${base}/api/index?__triz_vc_original_path=%2F`);
+    assert.equal(rewrittenRoot.status, 200);
+    assert.match(rewrittenRoot.headers.get('content-type'), /text\/html/);
+    assert.match(await rewrittenRoot.text(), /TrizEmpire/);
+
+    const rewrittenAsset = await fetch(`${base}/api/index?__triz_vc_original_path=%2Fcrew%2Fcrew-model.js&probe=1`);
+    assert.equal(rewrittenAsset.status, 200);
+    assert.match(rewrittenAsset.headers.get('content-type'), /javascript/);
 
     const model = await fetch(`${base}/crew/crew-model.js`);
     assert.equal(model.status, 200);
