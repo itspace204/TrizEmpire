@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXORA Operator System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Top Bar -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <div class="logo">
+                <div class="logo-icon">N</div>
+                <div class="logo-text">
+                    <div class="logo-title">NEXORA</div>
+                    <div class="logo-subtitle">OPERATOR SYSTEM</div>
+                </div>
+            </div>
+            <div class="greeting">
+                <div class="greeting-time">Good morning, Larry</div>
+                <div class="greeting-sub">Your agentic operator system is running smoothly.</div>
+            </div>
+        </div>
+        <div class="topbar-right">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search agents, missions, logs... ⌘K" id="searchInput">
+            </div>
+            <button class="topbar-btn" id="handModeBtn"><i class="fas fa-hand-paper"></i> Hand cursor</button>
+            <button class="topbar-btn" id="fullscreenBtn"><i class="fas fa-expand"></i> Full screen</button>
+            <div class="timezone">BERLIN <span id="currentTime">09:41:36</span></div>
+            <div class="user-profile">
+                <div class="user-avatar">L</div>
+                <div class="user-info">
+                    <div class="user-name">Larry</div>
+                    <div class="user-role">OPERATOR</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <nav class="nav-menu">
+                <div class="nav-section">
+                    <a href="#cockpit" class="nav-item active" data-page="cockpit">
+                        <i class="fas fa-desktop"></i> COCKPIT
+                    </a>
+                    <a href="#voice" class="nav-item" data-page="voice">
+                        <i class="fas fa-microphone"></i> VOICE MODE
+                    </a>
+                    <a href="#hand" class="nav-item" data-page="hand">
+                        <i class="fas fa-hand-rock"></i> HAND MODE
+                    </a>
+                    <a href="#chat" class="nav-item" data-page="chat">
+                        <i class="fas fa-comments"></i> CHAT
+                    </a>
+                    <a href="#missions" class="nav-item" data-page="missions">
+                        <i class="fas fa-clipboard-list"></i> MISSIONS
+                    </a>
+                    <a href="#docs" class="nav-item" data-page="docs">
+                        <i class="fas fa-file-alt"></i> DOCS
+                    </a>
+                    <a href="#schedule" class="nav-item" data-page="schedule">
+                        <i class="fas fa-calendar-alt"></i> SCHEDULE
+                    </a>
+                    <a href="#agentcity" class="nav-item" data-page="agentcity">
+                        <i class="fas fa-city"></i> AGENT CITY
+                    </a>
+                    <a href="#health" class="nav-item" data-page="health">
+                        <i class="fas fa-heartbeat"></i> HEALTH
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">MANAGE</div>
+                    <a href="#files" class="nav-item" data-page="files">
+                        <i class="fas fa-folder"></i> FILES
+                    </a>
+                    <a href="#terminal" class="nav-item" data-page="terminal">
+                        <i class="fas fa-terminal"></i> TERMINAL
+                    </a>
+                    <a href="#integrations" class="nav-item" data-page="integrations">
+                        <i class="fas fa-plug"></i> INTEGRATIONS
+                    </a>
+                    <a href="#guide" class="nav-item" data-page="guide">
+                        <i class="fas fa-book"></i> GUIDE
+                    </a>
+                    <a href="#settings" class="nav-item" data-page="settings">
+                        <i class="fas fa-cog"></i> SETTINGS
+                    </a>
+                </div>
+            </nav>
+            <button class="ask-nexora-btn">
+                <i class="fas fa-robot"></i> ASK NEXORA
+            </button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Cockpit Page -->
+            <section id="page-cockpit" class="page active">
+                <div class="page-header">
+                    <h1 class="page-title">Mission Control</h1>
+                    <div class="page-subtitle">● MISSION CONTROL · NOTHING RUNS WITHOUT YOUR WORD</div>
+                </div>
+
+                <div class="hero-card">
+                    <div class="hero-top">
+                        <div>
+                            <h2 class="hero-heading">Five decisions need you.</h2>
+                            <p class="hero-sub">3 plans to approve · 2 results to review</p>
+                        </div>
+                        <div class="hero-stats">
+                            <div class="stat-large">4</div>
+                            <div class="stat-label">DELIVERED · LAST 30 DAYS</div>
+                        </div>
+                    </div>
+                    <div class="hero-actions">
+                        <button class="btn btn-primary"><i class="fas fa-rocket"></i> Launch mission</button>
+                        <button class="btn btn-secondary"><i class="fas fa-redo"></i> Mission replay</button>
+                    </div>
+                    <div class="hero-metrics">
+                        <div class="metric-item">
+                            <div class="metric-value">5</div>
+                            <div class="metric-label">WAITING ON YOU</div>
+                            <div class="metric-desc">3 plans to approve · 2 results to review</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value">14h</div>
+                            <div class="metric-label">CYCLE TIME</div>
+                            <div class="metric-desc">Median from brief to delivery</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value">75%</div>
+                            <div class="metric-label">ON TIME</div>
+                            <div class="metric-desc">Within their time limits</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value">0 of 15</div>
+                            <div class="metric-label">AGENTS AT WORK</div>
+                            <div class="metric-desc">15 free</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bottom-row">
+                    <div class="card white-card">
+                        <div class="card-header">
+                            <span class="card-label">IN FOCUS</span>
+                            <h3 class="card-title">Deep ocean postcard</h3>
+                            <div class="card-meta">
+                                <span class="meta-tag">NX-1010</span>
+                                <span class="meta-tag status-ready">READY FOR REVIEW</span>
+                                <span class="meta-tag">2 AGENTS</span>
+                            </div>
+                        </div>
+                        <div class="focus-list">
+                            <div class="focus-item">
+                                <div class="focus-icon"><i class="fas fa-check"></i></div>
+                                <div class="focus-text">
+                                    <div class="focus-main">List deep-ocean facts</div>
+                                    <div class="focus-sub">RESEARCH · DONE IN 1M</div>
+                                </div>
+                            </div>
+                            <div class="focus-item">
+                                <div class="focus-icon"><i class="fas fa-check"></i></div>
+                                <div class="focus-text">
+                                    <div class="focus-main">Choose and write postcard</div>
+                                    <div class="focus-sub">CONTENT · DONE IN 1M</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="why-crew">
+                            <h4>WHY THIS CREW</h4>
+                            <p>Research agent gathers evidence-based facts. Content writer crafts engaging narrative.</p>
+                        </div>
+                    </div>
+
+                    <div class="card orange-card">
+                        <div class="card-header">
+                            <span class="card-label">ONLY YOU CAN DECIDE</span>
+                            <div class="desk-count">5</div>
+                            <h3 class="card-title">Your desk</h3>
+                        </div>
+                        <div class="desk-item">
+                            <div class="desk-inner">
+                                <div class="desk-meta">
+                                    <span class="desk-badge">REVIEW</span>
+                                    <span class="desk-id">NX-1010</span>
+                                    <span class="desk-time">0S AGO</span>
+                                </div>
+                                <p class="desk-desc">Read the result of Deep ocean postcard and accept it or send it back</p>
+                                <div class="desk-actions">
+                                    <button class="btn-small btn-dark">Accept result</button>
+                                    <button class="btn-small btn-dark-outline">Send back</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="desk-item">
+                            <div class="desk-inner">
+                                <div class="desk-meta">
+                                    <span class="desk-badge approve">APPROVE</span>
+                                    <span class="desk-id">NX-1009</span>
+                                    <span class="desk-time">5 D AGO</span>
+                                </div>
+                                <p class="desk-desc">Approve the plan for Habit worth starting</p>
+                                <div class="desk-actions">
+                                    <button class="btn-small btn-dark">Approve plan</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Voice Mode Page -->
+            <section id="page-voice" class="page">
+                <div class="page-header">
+                    <div>
+                        <span class="breadcrumb">NEXORA / VOICE MODE</span>
+                        <div class="page-subtitle">Your personal agent interface</div>
+                    </div>
+                    <div class="page-actions">
+                        <button class="btn-small">Voice on</button>
+                        <button class="btn-small">History</button>
+                        <button class="btn-small">Type</button>
+                    </div>
+                </div>
+                <div class="voice-center">
+                    <div class="voice-hero">
+                        <h1 class="voice-title">Intelligence,<br><span class="accent">within reach.</span></h1>
+                        <p class="voice-sub">A thought. A question. Your next move.</p>
+                    </div>
+                    <div class="voice-circle">
+                        <div class="voice-avatar">
+                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop" alt="Agent">
+                        </div>
+                        <div class="voice-rings"></div>
+                    </div>
+                    <div class="voice-status">
+                        <div class="voice-indicator">TAP THE CORE TO SPEAK</div>
+                        <div class="voice-wave">
+                            <span></span><span></span><span></span><span></span><span></span>
+                        </div>
+                        <button class="btn btn-primary voice-talk"><i class="fas fa-microphone"></i> Talk</button>
+                    </div>
+                </div>
+                <div class="agent-carousel">
+                    <div class="agent-thumb active">
+                        <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop" alt="Executor">
+                        <span>Executor</span>
+                    </div>
+                    <div class="agent-thumb">
+                        <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop" alt="Research">
+                        <span>Research</span>
+                    </div>
+                    <div class="agent-thumb">
+                        <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop" alt="Data">
+                        <span>Data</span>
+                    </div>
+                    <div class="agent-thumb">
+                        <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop" alt="Content">
+                        <span>Content</span>
+                    </div>
+                    <div class="agent-thumb">
+                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop" alt="Email">
+                        <span>Email</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Missions Page -->
+            <section id="page-missions" class="page">
+                <div class="page-header">
+                    <h1 class="page-title">Missions</h1>
+                    <div class="page-actions">
+                        <button class="btn btn-primary"><i class="fas fa-plus"></i> Launch mission</button>
+                    </div>
+                </div>
+                <div class="missions-board">
+                    <div class="mission-col">
+                        <h3 class="col-title">BRIEFING</h3>
+                        <div class="mission-card">
+                            <div class="mission-id">NX-1011</div>
+                            <div class="mission-title">Frustrations with multiple AI agents</div>
+                            <div class="mission-meta">Research + Data</div>
+                        </div>
+                    </div>
+                    <div class="mission-col">
+                        <h3 class="col-title">APPROVED</h3>
+                        <div class="mission-card">
+                            <div class="mission-id">NX-1009</div>
+                            <div class="mission-title">Habit worth starting</div>
+                            <div class="mission-meta">Research + Content</div>
+                        </div>
+                    </div>
+                    <div class="mission-col">
+                        <h3 class="col-title">IN PROGRESS</h3>
+                    </div>
+                    <div class="mission-col">
+                        <h3 class="col-title">REVIEW</h3>
+                        <div class="mission-card">
+                            <div class="mission-id">NX-1010</div>
+                            <div class="mission-title">Deep ocean postcard</div>
+                            <div class="mission-meta">Research + Content</div>
+                        </div>
+                    </div>
+                    <div class="mission-col">
+                        <h3 class="col-title">DELIVERED</h3>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Agent City Page -->
+            <section id="page-agentcity" class="page">
+                <div class="page-header">
+                    <h1 class="page-title">Agent City</h1>
+                    <div class="page-subtitle">Visual overview of agent activity</div>
+                </div>
+                <div class="city-map">
+                    <div class="city-center">Executor HQ</div>
+                    <div class="city-node node1">Research Institute</div>
+                    <div class="city-node node2">Code Foundry</div>
+                    <div class="city-node node3">Content Atelier</div>
+                    <div class="city-node node4">Design Loft</div>
+                    <div class="city-node node5">Data Citadel</div>
+                    <div class="city-node node6">Deal Desk</div>
+                    <div class="city-node node7">Care Center</div>
+                    <div class="city-node node8">Growth Studio</div>
+                </div>
+            </section>
+
+            <!-- Health Page -->
+            <section id="page-health" class="page">
+                <div class="page-header">
+                    <h1 class="page-title">System Health</h1>
+                    <div class="page-subtitle">Up 80d 19h without restart</div>
+                </div>
+                <div class="health-grid">
+                    <div class="health-card">
+                        <h3>CPU</h3>
+                        <div class="health-value">26.8%</div>
+                        <div class="health-bar"><div class="bar-fill" style="width: 27%"></div></div>
+                    </div>
+                    <div class="health-card">
+                        <h3>Memory</h3>
+                        <div class="health-value">3.6 / 7.0 GB</div>
+                        <div class="health-bar"><div class="bar-fill" style="width: 51%"></div></div>
+                    </div>
+                    <div class="health-card">
+                        <h3>Disk</h3>
+                        <div class="health-value">63.8 GB</div>
+                        <div class="health-bar"><div class="bar-fill" style="width: 64%"></div></div>
+                    </div>
+                    <div class="health-card">
+                        <h3>Load</h3>
+                        <div class="health-value">1.15 / 1.21 / 1.25</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Terminal Page -->
+            <section id="page-terminal" class="page">
+                <div class="page-header">
+                    <h1 class="page-title">Terminal</h1>
+                    <div class="page-subtitle">Real shell on this machine</div>
+                </div>
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <div class="terminal-dots">
+                            <span class="dot red"></span>
+                            <span class="dot yellow"></span>
+                            <span class="dot green"></span>
+                        </div>
+                        <div class="terminal-title">Shell</div>
+                    </div>
+                    <div class="terminal-body" id="terminalBody">
+                        <div class="terminal-line">komputermechanic@komputermechaniclyt:~$ hermes profile list</div>
+                        <div class="terminal-output" id="terminalOutput"></div>
+                        <div class="terminal-line">
+                            komputermechanic@komputermechaniclyt:~$ <span class="cursor">█</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="terminal-quick">
+                    <button class="quick-btn">uptime</button>
+                    <button class="quick-btn">free -h</button>
+                    <button class="quick-btn">df -h /</button>
+                    <button class="quick-btn">hermes profiles</button>
+                    <button class="quick-btn">clear</button>
+                </div>
+            </section>
+
+            <!-- Other Pages (stub) -->
+            <section id="page-chat" class="page">
+                <div class="page-header"><h1 class="page-title">Chat</h1></div>
+                <div class="card white-card"><p>Chat interface coming soon...</p></div>
+            </section>
+            <section id="page-docs" class="page">
+                <div class="page-header"><h1 class="page-title">Docs</h1></div>
+                <div class="card white-card"><p>Documents repository...</p></div>
+            </section>
+            <section id="page-schedule" class="page">
+                <div class="page-header"><h1 class="page-title">Schedule</h1></div>
+                <div class="card white-card"><p>Scheduled jobs...</p></div>
+            </section>
+            <section id="page-files" class="page">
+                <div class="page-header"><h1 class="page-title">Files</h1></div>
+                <div class="card white-card"><p>File browser...</p></div>
+            </section>
+            <section id="page-integrations" class="page">
+                <div class="page-header"><h1 class="page-title">Integrations</h1></div>
+                <div class="card white-card"><p>Integrations panel...</p></div>
+            </section>
+            <section id="page-guide" class="page">
+                <div class="page-header"><h1 class="page-title">Guide</h1></div>
+                <div class="card white-card"><p>Documentation guide...</p></div>
+            </section>
+            <section id="page-settings" class="page">
+                <div class="page-header"><h1 class="page-title">Settings</h1></div>
+                <div class="card white-card"><p>Settings...</p></div>
+            </section>
+            <section id="page-hand" class="page">
+                <div class="page-header"><h1 class="page-title">Hand Mode</h1></div>
+                <div class="card white-card"><p>Hand tracking mode...</p></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+</body>
+</html>
