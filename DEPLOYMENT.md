@@ -274,7 +274,11 @@ name — never the value — when:
   authentication (unchanged from earlier releases).
 - `NODE_ENV=production` without `TRIZ_ADMIN_PASSWORD_HASH` — **production
   can never start without authentication; there is no default password.**
+  (Configuring `SUPABASE_URL` + `SUPABASE_ANON_KEY` also satisfies the
+  production authentication requirement.)
 - A `TRIZ_*_PASSWORD_HASH` value is not a valid scrypt hash.
+- `SUPABASE_URL` without `SUPABASE_ANON_KEY` (or the reverse), or an
+  invalid `TRIZ_SUPABASE_ROLE`.
 - `HERMES_BASE_URL` / `HERMES_PUBLIC_URL` are not valid http(s) URLs, or
   contain embedded credentials (`user:pass@`) — the proxy has no
   upstream-auth support and URLs are handed to browsers, so secrets must not
@@ -290,6 +294,9 @@ name — never the value — when:
 | `ALLOW_REMOTE_HOST` | unset | Explicit opt-in for non-loopback binds. Not authentication. |
 | `TRIZ_ADMIN_PASSWORD_HASH` | unset | scrypt hash for the `admin` account (role `admin`). Enabling this turns authentication on; **required in production**. |
 | `TRIZ_OPERATOR_PASSWORD_HASH` | unset | scrypt hash for the `operator` account (role `operator`). |
+| `SUPABASE_URL` | unset | Supabase **Project URL**. Enables sign-in with a Supabase project user's email + password **alongside** the local scrypt accounts (local credentials always win and are never sent upstream). Must be set together with `SUPABASE_ANON_KEY`; the exchange happens server-side and the Supabase access token never reaches the browser. |
+| `SUPABASE_ANON_KEY` | unset | The project's **publishable/anon** key — never the secret/service_role key. Secret: keep it in your private env file. |
+| `TRIZ_SUPABASE_ROLE` | `admin` | Role granted to a Supabase sign-in: `admin` or `operator`. |
 | `TRIZ_SESSION_TTL_MINUTES` | `480` | Session idle timeout. |
 | `TRIZ_SESSION_ABS_MINUTES` | `1440` | Session absolute lifetime. |
 | `TRIZ_SESSION_SECRET` | unset | Enables **stateless HMAC-signed sessions** (required on serverless hosts such as Vercel, where function instances share no memory). Sessions then live inside the cookie: the idle timeout is **not** tracked (only the absolute lifetime — keep it short), and a cookie cannot be revoked before expiry (rotating the secret signs everyone out). Generate with `openssl rand -hex 32`. |

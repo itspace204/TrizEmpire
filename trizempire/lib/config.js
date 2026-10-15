@@ -97,6 +97,44 @@ function readHttpUrlVar(env, name, { allowEmpty = false } = {}) {
   return raw;
 }
 
+/* A non-empty single-line secret (API keys). Validation names the variable
+ * and never echoes the value — it may be a real credential. */
+function readSecretVar(env, name, { maxLength = 2048 } = {}) {
+  const raw = env[name];
+  if (raw === undefined || raw === '') return null;
+  if (/[\r\n\0]/.test(raw)) {
+    throw new Error(`${name} must be a single line without control characters.`);
+  }
+  if (raw.length > maxLength) {
+    throw new Error(`${name} is too long (maximum ${maxLength} characters).`);
+  }
+  return raw;
+}
+
+/* Supabase Auth — an OPTIONAL second identity provider, used alongside the
+ * local scrypt users (never instead of them). SUPABASE_URL and
+ * SUPABASE_ANON_KEY (the publishable/anon key, NOT the secret key) must be
+ * set together; TRIZ_SUPABASE_ROLE picks the role a Supabase user receives.
+ * Returns null when unconfigured, which keeps local-only deployments and
+ * every existing test untouched. */
+function readSupabaseConfig(env) {
+  const url = readHttpUrlVar(env, 'SUPABASE_URL');
+  const key = readSecretVar(env, 'SUPABASE_ANON_KEY');
+  if (url && !key) {
+    throw new Error('SUPABASE_URL is set but SUPABASE_ANON_KEY is empty — configure both (Supabase project → Settings → API).');
+  }
+  if (key && !url) {
+    throw new Error('SUPABASE_ANON_KEY is set but SUPABASE_URL is empty — configure both (Supabase project → Settings → API).');
+  }
+  if (!url) return null;
+  const role = env.TRIZ_SUPABASE_ROLE || 'admin';
+  if (role !== 'admin' && role !== 'operator') {
+    throw new Error('TRIZ_SUPABASE_ROLE must be one of: admin, operator.');
+  }
+  // Trailing slashes would double up against the fixed /auth/v1 path.
+  return { url: url.replace(/\/+$/, ''), key, role };
+}
+
 function readHashVar(env, name) {
   const raw = env[name];
   if (raw === undefined || raw === '') return null;
@@ -125,21 +163,25 @@ function resolveConfig(options = {}, env = process.env) {
 
   const host = options.host || env.HOST || '127.0.0.1';
   const users = options.users !== undefined ? options.users : usersFromEnvValidated(env);
-  const authRequired = users.length > 0;
+  /* Auth is required when EITHER a local scrypt user OR Supabase Auth is
+   * configured: production must never boot unauthenticated, and Supabase
+   * counts as authentication. */
+  const supabase = options.supabase !== undefined ? options.supabase : readSupabaseConfig(env);
+  const authRequired = users.length > 0 || !!supabase;
   const remoteAllowed = env.ALLOW_REMOTE_HOST === 'true' || options.allowRemoteHost === true;
   if (!LOOPBACK_HOSTS.has(host)) {
     if (!remoteAllowed) {
       throw new Error('Refusing non-loopback HOST. Set ALLOW_REMOTE_HOST=true only if you understand this server has no authentication.');
     }
     if (!authRequired) {
-      throw new Error('Refusing non-loopback bind without authentication. Configure TRIZ_ADMIN_PASSWORD_HASH (see scripts/hash-password.js) first.');
+      throw new Error('Refusing non-loopback bind without authentication. Configure TRIZ_ADMIN_PASSWORD_HASH (see scripts/hash-password.js) or Supabase Auth (SUPABASE_URL + SUPABASE_ANON_KEY) first.');
     }
   }
   /* Production may never run without authentication: there is no default
    * password, and a silent no-auth production mode is exactly the failure
    * this check exists to prevent. */
   if (isProduction && !authRequired) {
-    throw new Error('NODE_ENV=production requires authentication: configure TRIZ_ADMIN_PASSWORD_HASH (see scripts/hash-password.js). There is no default password.');
+    throw new Error('NODE_ENV=production requires authentication: configure TRIZ_ADMIN_PASSWORD_HASH (see scripts/hash-password.js) or Supabase Auth (SUPABASE_URL + SUPABASE_ANON_KEY). There is no default password.');
   }
 
   const ttlMinutes = readIntVar(env, 'TRIZ_SESSION_TTL_MINUTES') ?? 480;
@@ -253,6 +295,7 @@ function resolveConfig(options = {}, env = process.env) {
     host,
     port,
     users,
+    supabase: supabase || null,
     authRequired,
     secureCookies: options.secureCookies !== undefined ? options.secureCookies
       : (isProduction || env.TRIZ_SECURE_COOKIE === 'true'),
@@ -284,4 +327,4 @@ function usersFromEnvValidated(env) {
   return users;
 }
 
-module.exports = { loadEnvFile, resolveConfig };
+module.exports = { loadEnvFile, resolveConfig, readSupabaseConfig };

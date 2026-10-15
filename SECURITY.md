@@ -21,7 +21,12 @@ Binding behavior:
 - **Authentication:** scrypt-hashed passwords in environment variables
   (`TRIZ_ADMIN_PASSWORD_HASH`, `TRIZ_OPERATOR_PASSWORD_HASH`); no plaintext,
   no default credentials. `NODE_ENV=production` refuses to start without a
-  configured admin hash.
+  configured admin hash (or Supabase Auth). Optionally, Supabase Auth
+  (`SUPABASE_URL` + `SUPABASE_ANON_KEY`) accepts a project user's email and
+  password: the credential exchange runs **server-side** through the GoTrue
+  password grant, the Supabase access token never reaches the browser, and
+  this server mints its own HttpOnly session cookie afterwards — local
+  credentials are tried first and are never forwarded upstream.
 - **Configuration validation:** startup validates every environment variable
   (ports, URLs, session limits, hash format) in one module
   (`lib/config.js`) and fails fast naming the *variable*, never the value —

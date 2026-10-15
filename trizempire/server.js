@@ -4,7 +4,8 @@
  *
  * Responsibilities:
  *   - static delivery of the operator UI (allowlisted paths only)
- *   - server-side auth (scrypt env hashes, sessions, rate limiting, CSRF)
+ *   - server-side auth (scrypt env hashes, optional Supabase Auth sign-in,
+ *     sessions, rate limiting, CSRF)
  *   - server-side Hermes proxy for live status (single fixed upstream path)
  *   - health endpoints (/healthz public-minimal, /api/health/detail authorized)
  */
@@ -20,6 +21,7 @@ const {
   parseCookies, sessionCookie, clearedCookie, isSameOrigin, hasCsrfHeader,
 } = require('./lib/auth');
 const { loadEnvFile, resolveConfig } = require('./lib/config');
+const { supabaseSignIn, isEmailLike } = require('./lib/supabase');
 const hermesProxy = require('./lib/hermes');
 const workspacesLib = require('./lib/workspaces');
 
@@ -106,6 +108,9 @@ function resolveOptions(options = {}, env = process.env) {
     ? new StatelessSessionStore({ secret: cfg.sessionSecret, absoluteMs: cfg.sessionAbsoluteMs })
     : new SessionStore({ idleMs: cfg.sessionIdleMs, absoluteMs: cfg.sessionAbsoluteMs }));
   cfg.loginLimiter = options.loginLimiter || new RateLimiter({ max: 5, windowMs: 15 * 60 * 1000 });
+  /* Test seam for the Supabase Auth exchange — production always uses
+     the platform's fetch. */
+  cfg.supabaseFetch = options.supabaseFetch || undefined;
   cfg.statusLimiter = options.statusLimiter || new RateLimiter({ max: 120, windowMs: 60 * 1000 });
   /* Workspace mapping store: Upstash-compatible KV when configured
      (serverless hosts), else the local JSON file. */
@@ -181,7 +186,11 @@ function createServer(options = {}) {
       }
       return sendJson(res, 200, {
         hermesPublicUrl: cfg.hermesPublicUrl || null,
-        auth: { required: cfg.authRequired, users: cfg.users.map(u => u.username) },
+        auth: {
+          required: cfg.authRequired,
+          users: cfg.users.map(u => u.username),
+          supabase: !!cfg.supabase,
+        },
       });
     }
 
@@ -201,21 +210,56 @@ function createServer(options = {}) {
         return sendJson(res, 429, { error: 'too_many_attempts' });
       }
       return readJsonBody(req)
-        .then(body => {
-          const identity = verifyCredentials(cfg.users, body.username, body.password);
-          if (!identity) {
-            cfg.loginLimiter.fail(key);
-            console.log(`auth login-fail user=${String(body.username).slice(0, 64)} ip=${key}`);
-            return sendJson(res, 401, { error: 'invalid_credentials' });
+        .then(async body => {
+          const username = String(body.username || '').trim();
+          const password = body.password;
+
+          const establishSession = (sessionUser, role) => {
+            const token = cfg.sessions.create(sessionUser, role);
+            res.setHeader('Set-Cookie', sessionCookie(token, {
+              secure: cfg.secureCookies,
+              maxAgeSeconds: cfg.sessions.idleMs / 1000,
+            }));
+            return sendJson(res, 200, { ok: true, user: sessionUser, role });
+          };
+
+          /* 1st try: the local scrypt users (unchanged behavior — local
+             credentials always win and are never sent upstream). */
+          const identity = verifyCredentials(cfg.users, username, password);
+          if (identity) {
+            cfg.loginLimiter.clear(key);
+            console.log(`auth login-ok user=${identity.username} ip=${key} provider=local`);
+            return establishSession(identity.username, identity.role);
           }
-          cfg.loginLimiter.clear(key);
-          const token = cfg.sessions.create(identity.username, identity.role);
-          res.setHeader('Set-Cookie', sessionCookie(token, {
-            secure: cfg.secureCookies,
-            maxAgeSeconds: cfg.sessions.idleMs / 1000,
-          }));
-          console.log(`auth login-ok user=${identity.username} ip=${key}`);
-          return sendJson(res, 200, { ok: true, user: identity.username, role: identity.role });
+
+          /* 2nd try: Supabase Auth, when configured and the identifier is an
+             email. The exchange is server-side; on success we mint our own
+             session cookie, so the Supabase token never reaches the browser. */
+          if (cfg.supabase && isEmailLike(username)) {
+            try {
+              const signedIn = await supabaseSignIn(cfg.supabase, username, password, {
+                fetchImpl: cfg.supabaseFetch,
+              });
+              cfg.loginLimiter.clear(key);
+              console.log(`auth login-ok user=${signedIn.user.email} ip=${key} provider=supabase`);
+              return establishSession(signedIn.user.email, cfg.supabase.role || 'admin');
+            } catch (error) {
+              const code = error && error.code ? error.code : 'upstream_unavailable';
+              if (code === 'invalid_credentials' || code === 'email_not_confirmed') {
+                cfg.loginLimiter.fail(key);
+                console.log(`auth login-fail user=${username.slice(0, 64)} ip=${key} provider=supabase reason=${code}`);
+                return sendJson(res, 401, { error: code });
+              }
+              /* Upstream/config problem, not a wrong password: report it
+                 WITHOUT burning the caller's rate-limit budget. */
+              console.log(`auth login-error ip=${key} provider=supabase reason=${code}`);
+              return sendJson(res, 502, { error: 'auth_upstream_unavailable' });
+            }
+          }
+
+          cfg.loginLimiter.fail(key);
+          console.log(`auth login-fail user=${username.slice(0, 64)} ip=${key}`);
+          return sendJson(res, 401, { error: 'invalid_credentials' });
         })
         .catch(err => {
           if (res.headersSent) return;
@@ -432,7 +476,7 @@ if (require.main === module) {
     console.log(`  http://${cfg.host}:${bound}/`);
     if (loadedEnv.length) console.log(`  Loaded .env (${loadedEnv.length} variables; OS environment takes precedence)`);
     console.log(cfg.authRequired
-      ? `  Authentication: enabled (${cfg.users.map(u => u.username).join(', ')})`
+      ? `  Authentication: enabled (${[...cfg.users.map(u => u.username), ...(cfg.supabase ? ['supabase'] : [])].join(', ')})`
       : '  Authentication: DISABLED — loopback-only mode. Set TRIZ_ADMIN_PASSWORD_HASH to enable login.');
     console.log(`  Hermes upstream: ${cfg.hermesBaseUrl}${cfg.hermesPublicUrl ? '' : ' (console embed disabled: HERMES_PUBLIC_URL is empty)'}`);
   });

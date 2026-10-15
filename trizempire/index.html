@@ -2228,7 +2228,7 @@ document.getElementById('avg-time').textContent = '—';
    The browser only talks to this server. /api/hermes/status is a
    server-side proxy to the operator's Hermes backend, so the UI never
    assumes 127.0.0.1:9119 means the visitor's own machine. */
-const CFG = { hermesPublicUrl: null, authRequired: false };
+const CFG = { hermesPublicUrl: null, authRequired: false, supabase: false };
 let hermesState = 'connecting';   // connecting | connected | disconnected | error
 let HERMES_BASE = 'http://127.0.0.1:9119';  // local-only console embed, from server config
 const RINGS = {default:'#ff6a1a',research:'#3aa0ff',writer:'#b06aff',developer:'#2fd08a',data:'#ff5aa0'};
@@ -2485,7 +2485,9 @@ document.getElementById('auth-form').addEventListener('submit', async e=>{
     if(!r.ok){
       err.textContent = r.status === 429
         ? 'Too many attempts — wait before trying again.'
-        : (b.error === 'invalid_credentials' ? 'Invalid username or password.' : 'Sign-in failed.');
+        : (b.error === 'invalid_credentials' ? 'Invalid username or password.'
+        : (b.error === 'email_not_confirmed' ? 'Confirm your email address first, then sign in again.'
+        : (r.status === 502 ? 'Sign-in service is unavailable — try again shortly.' : 'Sign-in failed.')));
       return;
     }
     document.getElementById('auth-pass').value = '';
@@ -2515,6 +2517,12 @@ async function boot(){
     const c = await (await fetch('/api/config')).json();
     CFG.hermesPublicUrl = c.hermesPublicUrl;
     CFG.authRequired = !!(c.auth && c.auth.required);
+    CFG.supabase = !!(c.auth && c.auth.supabase);
+    if(CFG.supabase){
+      /* Supabase Auth is enabled: the first field is an email address.
+         Local usernames (admin/operator) still work as before. */
+      document.getElementById('auth-user').placeholder = 'Email or username';
+    }
     if(c.hermesPublicUrl) HERMES_BASE = c.hermesPublicUrl;
   }catch{ /* config unavailable: defaults stay, loadHermes reports the failure */ }
   if(CFG.authRequired){
