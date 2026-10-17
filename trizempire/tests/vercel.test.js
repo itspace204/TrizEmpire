@@ -388,6 +388,118 @@ test('vercel.json routes everything to the entry and bundles what it reads', () 
   assert.equal(fn.includeFiles, 'trizempire/**',
     'Vercel requires includeFiles to be a single glob string covering the app assets');
   assert.ok(Number.isInteger(fn.maxDuration) && fn.maxDuration > 0);
+  /* Every deploy — preview and production — runs the environment check as
+     its build step, so a bad env var fails the build BEFORE the deployment
+     goes live instead of shipping an opaque 500. */
+  assert.equal(config.buildCommand, 'node scripts/check-env.js',
+    'the build must be gated on the environment preflight');
+  assert.ok(fs.existsSync(path.join(repoRoot, 'scripts', 'check-env.js')),
+    'the build command must point at a real file');
+});
+
+/* ── pre-deploy environment check (vercel.json → buildCommand) ──────── */
+
+const CHECKER = path.join(repoRoot, 'scripts', 'check-env.js');
+
+/* Minimal OS-level environment for the spawned checker: everything else
+ * must come from the env file argument, mirroring how file mode isolates
+ * the check from the calling shell. */
+const CHECKER_OS_KEYS = [
+  'PATH', 'PATHEXT', 'SystemRoot', 'SYSTEMDRIVE', 'COMSPEC', 'WINDIR',
+  'TEMP', 'TMP', 'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'LANG',
+];
+
+function runChecker(envOverrides, args = []) {
+  const env = {};
+  for (const key of CHECKER_OS_KEYS) {
+    if (process.env[key] !== undefined) env[key] = process.env[key];
+  }
+  Object.assign(env, envOverrides);
+  const r = spawnSync(process.execPath, [CHECKER, ...args], {
+    env, cwd: repoRoot, encoding: 'utf8', timeout: 60000,
+  });
+  return { status: r.status, out: `${r.stdout || ''}${r.stderr || ''}` };
+}
+
+function envFile(content) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'triz-preflight-'));
+  const file = path.join(dir, 'env.vercel');
+  fs.writeFileSync(file, `${content}\n`, 'utf8');
+  return file;
+}
+
+test('check-env passes a healthy deployment environment without echoing values', () => {
+  const hash = hashPassword(E2E_PASSWORD);
+  const secret = 'v'.repeat(32);
+  const r = runChecker({
+    TRIZ_ADMIN_PASSWORD_HASH: hash,
+    TRIZ_SESSION_SECRET: secret,
+  });
+  assert.equal(r.status, 0, `expected a clean preflight, got:\n${r.out}`);
+  assert.match(r.out, /preflight ok/);
+  assert.ok(!r.out.includes(E2E_PASSWORD), 'the password must never appear in output');
+  assert.ok(!r.out.includes(hash), 'the hash must never appear in output');
+  assert.ok(!r.out.includes(secret), 'the session secret must never appear in output');
+});
+
+test('check-env fails a broken environment and names the variable', () => {
+  // Nothing configured: the Vercel-specific rule fires first.
+  let r = runChecker({});
+  assert.equal(r.status, 1, `expected failure, got:\n${r.out}`);
+  assert.match(r.out, /TRIZ_SESSION_SECRET is not set/);
+  assert.match(r.out, /openssl rand -hex 32/);
+
+  // Session secret present, no password: the server's own fail-fast.
+  r = runChecker({ TRIZ_SESSION_SECRET: 'v'.repeat(32) });
+  assert.equal(r.status, 1);
+  assert.match(r.out, /TRIZ_ADMIN_PASSWORD_HASH/);
+  assert.match(r.out, /NODE_ENV=production requires authentication/);
+
+  // A plain password pasted instead of the scrypt hash.
+  r = runChecker({ TRIZ_ADMIN_PASSWORD_HASH: 'hunter2', TRIZ_SESSION_SECRET: 'v'.repeat(32) });
+  assert.equal(r.status, 1);
+  assert.match(r.out, /TRIZ_ADMIN_PASSWORD_HASH is not a valid scrypt hash/);
+  assert.ok(!r.out.includes('hunter2'), 'the mistyped secret must never be echoed');
+
+  // A too-short session secret, named without its value.
+  r = runChecker({
+    TRIZ_ADMIN_PASSWORD_HASH: hashPassword(E2E_PASSWORD),
+    TRIZ_SESSION_SECRET: 'sekrit-short',
+  });
+  assert.equal(r.status, 1);
+  assert.match(r.out, /TRIZ_SESSION_SECRET must be at least 32 characters/);
+  assert.ok(!r.out.includes('sekrit-short'));
+});
+
+test('check-env file mode validates the file alone, ignoring this shell', () => {
+  const good = [
+    `TRIZ_ADMIN_PASSWORD_HASH=${hashPassword(E2E_PASSWORD)}`,
+    `TRIZ_SESSION_SECRET=${'v'.repeat(32)}`,
+    'HERMES_SESSION_TOKEN=leak-marker-value-12345',
+  ].join('\n');
+  const ok = runChecker({}, [envFile(good)]);
+  assert.equal(ok.status, 0, `expected a clean preflight, got:\n${ok.out}`);
+  assert.match(ok.out, /preflight ok/);
+  assert.ok(!ok.out.includes('leak-marker-value-12345'),
+    'environment values must never be printed, even on success');
+
+  // Ambient TRIZ_* from the calling shell must NOT rescue an incomplete
+  // file: the file omits the session secret, so the check fails.
+  const partial = `TRIZ_ADMIN_PASSWORD_HASH=${hashPassword(E2E_PASSWORD)}`;
+  const ambient = runChecker(
+    { TRIZ_SESSION_SECRET: 'ambient-secret-must-not-leak' },
+    [envFile(partial)],
+  );
+  assert.equal(ambient.status, 1, 'file mode must not inherit shell variables');
+  assert.match(ambient.out, /TRIZ_SESSION_SECRET is not set/);
+  assert.ok(!ambient.out.includes('ambient-secret-must-not-leak'));
+});
+
+test('check-env cannot report success when it cannot check (exit 2)', () => {
+  const missing = runChecker({}, [path.join(repoRoot, 'no-such-env-file-vercel')]);
+  assert.equal(missing.status, 2, missing.out);
+  assert.match(missing.out, /env file not found/);
+  assert.doesNotMatch(missing.out, /preflight ok/);
 });
 
 test('api/index.js exports a handler that serves the full app', async t => {

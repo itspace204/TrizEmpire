@@ -5,5 +5,8 @@
   "type": "commonjs",
   "engines": {
     "node": ">=22"
+  },
+  "scripts": {
+    "check-env": "node scripts/check-env.js"
   }
 }

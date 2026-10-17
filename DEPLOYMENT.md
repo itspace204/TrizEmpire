@@ -167,6 +167,39 @@ or a variable saved for the wrong environment scope. Vercel applies
 environment changes only to **new deployments**: fix the variable, then
 redeploy (`vercel --prod`, or → *Redeploy* in the dashboard).
 
+**The environment is validated before a deployment goes live.**
+`vercel.json` sets `"buildCommand": "node scripts/check-env.js"`, so every
+deploy — preview and production — first boots the **real serverless entry**
+(`api/index.js`) in a child process with the environment being deployed
+(forced `NODE_ENV=production`, `VERCEL=1`) and probes `/healthz` through
+the actual handler:
+
+- a missing or malformed `TRIZ_ADMIN_PASSWORD_HASH`, a missing or short
+  `TRIZ_SESSION_SECRET`, or any other configuration error **fails the
+  build** — the deploy never takes the alias, and the previous good
+  deployment keeps serving;
+- the build log names the offending variable and never its values (every
+  value from the checked environment is redacted from the output);
+- the check itself failing (exit 2, "not validated") also blocks the
+  deploy — an environment that cannot be validated is not shipped;
+- **scope matters:** a Preview build validates the Preview environment.
+  Scope your variables to "All Environments" (or to both Preview and
+  Production), otherwise the preview deploy is rejected with the variable
+  to add;
+- `TRIZ_SESSION_SECRET` is enforced HERE rather than by the server, because
+  stateful sessions are legal config on a single instance but silently
+  broken across Vercel's instances.
+
+Preflight on your machine (optional; needs the [Vercel CLI](https://vercel.com/docs/cli)):
+
+```sh
+vercel env pull .env.vercel --environment=production   # gitignored
+node scripts/check-env.js .env.vercel                  # exit 0 = boots clean
+```
+
+File mode validates **only** the file — variables in your shell can neither
+rescue an incomplete file nor break a complete one.
+
 Honest limitations of the serverless target — the UI reports all of them
 rather than pretending:
 

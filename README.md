@@ -84,6 +84,7 @@ All via environment variables — template in [trizempire/.env.example](trizempi
 - `TRIZ_SESSION_SECRET` — stateless HMAC-signed sessions, required on serverless hosts (Vercel) where instances share no memory.
 - `KV_REST_API_URL`/`KV_REST_API_TOKEN` (or the `UPSTASH_REDIS_REST_*` pair) — Upstash-compatible store for the workspace→agent mapping on read-only/serverless filesystems.
 - `TRIZ_MISSIONS_FILE` — where the MISSIONS page's work orders persist (default `data/missions.json`); missions share the KV/Neon stores with the mapping when those are configured (precedence **Neon > KV > file**), and a corrupt stored document is reported instead of served.
+- On Vercel every deploy runs `scripts/check-env.js` as its build step: the real serverless entry is booted with the environment being deployed, so a bad variable fails the build **before** the deployment goes live (values are never printed). Local preflight: `node scripts/check-env.js .env.vercel` after `vercel env pull`.
 
 ## Architecture
 
