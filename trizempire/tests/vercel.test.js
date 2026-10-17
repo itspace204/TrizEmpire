@@ -483,25 +483,86 @@ function coldStart(overrides, source) {
   return { status: res.status, out: `${res.stdout || ''}${res.stderr || ''}` };
 }
 
-const LOAD_PROBE = `try { require(${JSON.stringify(ENTRY)}); console.log('LOADED'); } catch (e) { console.log('THREW: ' + e.message); }`;
+/* A failed boot must answer IN BAND: the platform turns an exception that
+ * escapes this module into an opaque 500, hiding the message that names the
+ * offending variable. The probe loads the entry the way the platform does
+ * and invokes the handler with a minimal response pair, printing exactly
+ * what the operator would see over HTTPS. */
+const BOOT_PROBE = `
+  let handler;
+  try {
+    handler = require(${JSON.stringify(ENTRY)});
+  } catch (e) {
+    console.log('RESULT:' + JSON.stringify({ threw: e.message }));
+    process.exit(0);
+  }
+  const headers = {};
+  const chunks = [];
+  const res = {
+    statusCode: 0,
+    setHeader(k, v) { headers[k.toLowerCase()] = v; },
+    getHeader(k) { return headers[k.toLowerCase()]; },
+    removeHeader(k) { delete headers[k.toLowerCase()]; },
+    end(chunk) {
+      if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk));
+      console.log('RESULT:' + JSON.stringify({
+        status: this.statusCode,
+        type: headers['content-type'] || null,
+        cache: headers['cache-control'] || null,
+        body: chunks.join(''),
+      }));
+    },
+    write() { return true; },
+    on() { return this; }, once() { return this; }, emit() { return false; },
+    flushHeaders() {}, setEncoding() {}, cork() {}, uncork() {},
+  };
+  handler({ url: '/api/config', method: 'GET', headers: {} }, res);
+`;
+
+function bootResponse(overrides) {
+  const r = coldStart(overrides, BOOT_PROBE);
+  const line = (r.out.split('\n').find(l => l.startsWith('RESULT:')) || '').slice(7);
+  return { raw: r.out, status: r.status, res: line ? JSON.parse(line) : null };
+}
 
 test('production cold start fails fast and names the offending variable', () => {
-  // The live-deployment failure class: a production instance without a
-  // password must refuse to start, and the error must NAME the variable to
-  // set (there is no default password).
-  let r = coldStart({ NODE_ENV: 'production' }, LOAD_PROBE);
-  assert.match(r.out, /TRIZ_ADMIN_PASSWORD_HASH/, 'the error must name the missing variable');
-  assert.doesNotMatch(r.out, /LOADED/, 'a production instance without a password must never start');
+  /* The live-deployment failure class: a production instance without a
+   * password must refuse to serve — answering 500 with the variable to fix
+   * (there is no default password), never the app, never an opaque
+   * platform error. */
+  let b = bootResponse({ NODE_ENV: 'production' });
+  assert.ok(b.res, `probe produced no result (status=${b.status}): ${b.raw}`);
+  assert.equal(b.res.threw, undefined, 'the entry must not throw; it answers in band');
+  assert.equal(b.res.status, 500, 'a production instance without a password must never serve');
+  assert.match(b.res.body, /TRIZ_ADMIN_PASSWORD_HASH/, 'the error must name the missing variable');
+  assert.doesNotMatch(b.res.body, /<!doctype html/i, 'no app markup on a failed boot');
 
   // A mistyped NODE_ENV from the dashboard names the allowed values.
-  r = coldStart({ NODE_ENV: 'Production' }, LOAD_PROBE);
-  assert.match(r.out, /NODE_ENV must be one of/);
+  b = bootResponse({ NODE_ENV: 'Production' });
+  assert.equal(b.res.status, 500);
+  assert.match(b.res.body, /NODE_ENV must be one of/);
 
   // A non-scrypt secret pasted into the dashboard is rejected by name,
   // without echoing the (possibly real) value back.
-  r = coldStart({ NODE_ENV: 'production', TRIZ_ADMIN_PASSWORD_HASH: 'hunter2' }, LOAD_PROBE);
-  assert.match(r.out, /TRIZ_ADMIN_PASSWORD_HASH is not a valid scrypt hash/);
-  assert.doesNotMatch(r.out, /hunter2/, 'the invalid secret must never be echoed');
+  b = bootResponse({ NODE_ENV: 'production', TRIZ_ADMIN_PASSWORD_HASH: 'hunter2' });
+  assert.equal(b.res.status, 500);
+  assert.match(b.res.body, /TRIZ_ADMIN_PASSWORD_HASH is not a valid scrypt hash/);
+  assert.doesNotMatch(b.res.body, /hunter2/, 'the invalid secret must never be echoed');
+
+  // The same for a session secret Vercel could not sign with.
+  b = bootResponse({
+    NODE_ENV: 'production',
+    TRIZ_ADMIN_PASSWORD_HASH: hashPassword(E2E_PASSWORD),
+    TRIZ_SESSION_SECRET: 'short-secret',
+  });
+  assert.equal(b.res.status, 500);
+  assert.match(b.res.body, /TRIZ_SESSION_SECRET must be at least 32 characters/);
+  assert.doesNotMatch(b.res.body, /short-secret/, 'the weak secret must never be echoed');
+
+  // The diagnosis is plain text readable straight from the URL.
+  b = bootResponse({ NODE_ENV: 'production' });
+  assert.equal(b.res.type, 'text/plain; charset=utf-8');
+  assert.match(b.res.cache, /no-store/, 'a boot failure must never be cached');
 });
 
 test('production serverless entry serves the full app end-to-end', () => {

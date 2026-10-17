@@ -157,6 +157,16 @@ Variables):
 | `HERMES_BASE_URL` | Your Hermes dashboard's **publicly reachable** URL — see the honest limitation below. |
 | `HERMES_PUBLIC_URL` | Leave **unset**: visitors' browsers cannot reach your machine's loopback, so the embedded console stays off (the UI says so). |
 
+If the deployment answers **500 on every path** (dashboard title
+`500: INTERNAL_SERVER_ERROR`), the function is failing at cold start — in
+practice, one of the required variables. The response body now carries the
+startup message itself, which names the variable and never its value: a
+plain password pasted instead of the `scrypt$…` hash, a
+`TRIZ_SESSION_SECRET` shorter than 32 characters, a mistyped `NODE_ENV`,
+or a variable saved for the wrong environment scope. Vercel applies
+environment changes only to **new deployments**: fix the variable, then
+redeploy (`vercel --prod`, or → *Redeploy* in the dashboard).
+
 Honest limitations of the serverless target — the UI reports all of them
 rather than pretending:
 

@@ -24,13 +24,35 @@
  *     it the mapping falls back to /tmp, which is wiped on every deploy.
  */
 
-const { createServer } = require('../trizempire/server');
-
 /* One server per cold start: the session/rate-limit stores live for as long
- * as the instance stays warm. */
-const server = createServer();
+ * as the instance stays warm. Configuration resolves here and this target
+ * fails fast by design — but an exception escaping the module would only
+ * ever surface as Vercel's opaque "500: INTERNAL_SERVER_ERROR", trapping
+ * the message that names the offending variable in logs the operator may
+ * never open. So a boot failure is captured and answered IN BAND: every
+ * request gets HTTP 500 with the startup message (config errors name the
+ * variable and never echo its value), straight from the URL. The app never
+ * serves a single request on a failed boot. */
+let server = null;
+let bootError = null;
+try {
+  /* The require is inside the guard too: a missing or broken bundle is a
+     boot failure like any other and must report itself the same way. */
+  const { createServer } = require('../trizempire/server');
+  server = createServer();
+} catch (err) {
+  bootError = err instanceof Error ? err : new Error(String(err));
+}
 
 module.exports = (req, res) => {
+  if (bootError) {
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end('TrizEmpire did not start: '
+      + (bootError.message || 'unknown startup error') + '\n');
+    return;
+  }
   /* Vercel rewrites internally route the request to /api/index. Carry the
    * source pathname in a reserved query parameter so this shared server sees
    * the real route (/, /crew/..., /api/...) regardless of whether the
