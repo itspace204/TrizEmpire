@@ -308,6 +308,7 @@ name — never the value — when:
 | `HERMES_TIMEOUT_MS` | `8000` | Per-attempt upstream timeout (one retry on network errors). Sized for the per-profile aggregation endpoints, which take seconds while the messaging gateway is running. |
 | `HERMES_SESSION_TOKEN` | unset | Upstream session token for the authenticated per-agent endpoints (`/api/profiles*`). Sent as `X-Hermes-Session-Token`, only to the fixed allowlisted upstream paths, never to browsers. Empty = per-agent crew data disabled (the endpoint reports `unconfigured` and the UI keeps global signals). |
 | `TRIZ_WORKSPACES_FILE` | `data/workspaces.json` (under the app directory; `/tmp` on Vercel) | Where the operator's workspace→agent mapping (saved from the cockpit's ＋ ASSIGN panel) is persisted. Relative paths resolve against the app directory. On systemd the app tree is read-only (`ProtectSystem=strict`); the unit's `ReadWritePaths=` opens the default `data/` directory — create it owned by the service user before first start. |
+| `TRIZ_MISSIONS_FILE` | `data/missions.json` (under the app directory; `/tmp` on Vercel) | Where the **MISSIONS page's** records (the operator's work orders: title, crew profile ids, step stamps, status) persist as one JSON document. Same three backends as the mapping — KV and Neon are shared when configured (precedence **Neon > KV > file**), validation runs before every write, and a corrupt or invalid document is reported by `GET /api/missions` with empty defaults applied instead. Relative paths resolve against the app directory; the systemd unit's `ReadWritePaths=` already covers the default `data/` location. |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | unset | Upstash-compatible Redis REST store for the workspace mapping — **required for durable mapping on serverless hosts** (the lambda filesystem is read-only). The `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` pair works too. Both halves must be set together; when configured, KV takes precedence over the file store. |
 | `NEON_DATABASE_URL` (or `DATABASE_URL`) | unset | Neon **serverless Postgres** connection string (`postgres://user:pass@host/db?sslmode=require`) — the same workspace mapping stored as one `jsonb` row in a `trizempire_settings` table that this server creates on first use. Takes precedence over KV and the file store (**Neon > KV > file**). All SQL is parameterized, sent over Neon's HTTPS endpoint with the built-in `fetch`, so the project still has **zero npm dependencies**. The DSN contains the database password: keep it in your secret store only, and note that the connecting role should not be the broader `neon_superuser` if you can avoid it. |
 | `TRIZ_TRUST_PROXY` | unset (`true` automatically when `VERCEL=1`) | Trust `X-Real-IP`/`X-Forwarded-For` for rate-limit bucketing. Enable only behind a reverse proxy **you** control — on a directly-exposed server it lets clients spoof their IP. |
@@ -487,6 +488,13 @@ GET /api/hermes/messaging?profile=NAME  → Hermes /api/messaging/platforms?prof
   `TRIZ_WORKSPACES_FILE`. A corrupt or invalid stored file is reported by
   `GET /api/workspaces` and the shipped defaults apply instead. A profile in
   no workspace simply has no card and stays reachable through the Crew view.
+- Mission records ride on the same storage: the MISSIONS page reads and
+  writes `/api/missions` against one JSON document at `TRIZ_MISSIONS_FILE`
+  (default `data/missions.json`), or against KV/Neon when those are
+  configured (same variables, precedence **Neon > KV > file**). Every write
+  is validated by `lib/missions.js` first; a corrupt or invalid stored
+  document is reported by `GET /api/missions` and empty defaults apply —
+  the endpoint answers 200 either way and never crashes.
 
 ## Logging and health checks
 
@@ -501,10 +509,14 @@ GET /api/hermes/messaging?profile=NAME  → Hermes /api/messaging/platforms?prof
 
 - The app has **no database**. Sessions and rate-limit state are in-memory and
   reset on restart (users simply sign in again).
-- The only file the server writes is the workspace→agent mapping
+- The server writes two files: the workspace→agent mapping
   (`TRIZ_WORKSPACES_FILE`, default `data/workspaces.json` — profile names
-  only, no secrets). Include it in backups if you want to keep an operator's
-  assignment across rebuilds; losing it just restores the shipped defaults.
+  only) and the mission records (`TRIZ_MISSIONS_FILE`, default
+  `data/missions.json` — titles, crew profile ids and timestamps; no
+  secrets). With KV/Neon configured both live in that store instead and the
+  files stay unused. Include them in backups to keep operator state across
+  rebuilds; losing them just restores empty defaults (and the shipped
+  workspace defaults).
 - Recovery = redeploy the repository at the desired revision and restart.
 - Back up your environment configuration (hashed passwords, URLs) in your
   secret manager — it is the only other persistent state.

@@ -58,13 +58,15 @@ Sign in as `admin` with the password you hashed. Optionally set `TRIZ_OPERATOR_P
 ```sh
 cd trizempire
 npm run check     # syntax check across the project
-npm test          # 119 tests: server, auth, sessions (server-side and
+npm test          # 190 tests: server, auth, sessions (server-side and
                   # stateless/signed), CSRF, rate limiting, proxy states,
                   # traversal/symlink protection, headers, environment-config
                   # validation and .env hygiene, workspace-mapping store
-                  # (file + Upstash REST), deployment bundle (systemd unit,
-                  # pm2 file, nginx TLS), the Vercel serverless entry/config,
-                  # plus a real-Hermes integration test (skips if Hermes is down)
+                  # (file + Upstash REST), missions model and the
+                  # /api/missions lifecycle routes, deployment bundle
+                  # (systemd unit, pm2 file, nginx TLS), the Vercel
+                  # serverless entry/config, plus a real-Hermes integration
+                  # test (skips if Hermes is down)
 ```
 
 ## Configuration
@@ -81,6 +83,7 @@ All via environment variables — template in [trizempire/.env.example](trizempi
 - `NODE_ENV=production` — `Secure` session cookies.
 - `TRIZ_SESSION_SECRET` — stateless HMAC-signed sessions, required on serverless hosts (Vercel) where instances share no memory.
 - `KV_REST_API_URL`/`KV_REST_API_TOKEN` (or the `UPSTASH_REDIS_REST_*` pair) — Upstash-compatible store for the workspace→agent mapping on read-only/serverless filesystems.
+- `TRIZ_MISSIONS_FILE` — where the MISSIONS page's work orders persist (default `data/missions.json`); missions share the KV/Neon stores with the mapping when those are configured (precedence **Neon > KV > file**), and a corrupt stored document is reported instead of served.
 
 ## Architecture
 

@@ -280,6 +280,17 @@ function resolveConfig(options = {}, env = process.env) {
     throw new Error('TRIZ_WORKSPACES_FILE must be a non-empty file path without control characters.');
   }
 
+  /* Mission records (the MISSIONS page) persist next to the workspace
+   * mapping, on the same backends. Same rules: default inside the app root
+   * (data/missions.json), /tmp on serverless hosts, validation names the
+   * variable and never echoes the value. */
+  const missionsFile = options.missionsFile || env.TRIZ_MISSIONS_FILE
+    || (env.VERCEL ? path.join(os.tmpdir(), 'trizempire-missions.json')
+      : path.join(root, 'data', 'missions.json'));
+  if (typeof missionsFile !== 'string' || missionsFile.trim() === '' || /[\0\r\n]/.test(missionsFile)) {
+    throw new Error('TRIZ_MISSIONS_FILE must be a non-empty file path without control characters.');
+  }
+
   /* Optional Upstash-compatible Redis REST store for the workspace mapping
    * (serverless hosts have a read-only filesystem). Both variable pairs
    * seen in the wild are accepted: Vercel Marketplace injects
@@ -343,6 +354,7 @@ function resolveConfig(options = {}, env = process.env) {
     hermesTimeoutMs,
     hermesSessionToken,
     workspacesFile: path.isAbsolute(workspacesFile) ? workspacesFile : path.resolve(root, workspacesFile),
+    missionsFile: path.isAbsolute(missionsFile) ? missionsFile : path.resolve(root, missionsFile),
     workspacesKvUrl: workspacesKvUrl || null,
     workspacesKvToken: workspacesKvToken || null,
     sessionSecret: sessionSecret || null,

@@ -24,6 +24,7 @@ const { loadEnvFile, resolveConfig } = require('./lib/config');
 const { supabaseSignIn, isEmailLike } = require('./lib/supabase');
 const hermesProxy = require('./lib/hermes');
 const workspacesLib = require('./lib/workspaces');
+const missionsLib = require('./lib/missions');
 
 const DEFAULT_ROOT = __dirname;
 const SESSION_COOKIE = 'triz_session';
@@ -121,6 +122,17 @@ function resolveOptions(options = {}, env = process.env) {
       : null,
     neon: cfg.neon,
     // Test seam: production always uses the platform's fetch.
+    neonFetchImpl: options.neonFetch,
+    neonQueryImpl: options.neonQuery,
+  });
+  /* Mission records (the MISSIONS page): same three backends, one JSON
+     document — see lib/missions.js for the model and lifecycle. */
+  cfg.missionsStore = options.missionsStore || missionsLib.createStore({
+    file: cfg.missionsFile,
+    kv: (cfg.workspacesKvUrl && cfg.workspacesKvToken)
+      ? { url: cfg.workspacesKvUrl, token: cfg.workspacesKvToken }
+      : null,
+    neon: cfg.neon,
     neonFetchImpl: options.neonFetch,
     neonQueryImpl: options.neonQuery,
   });
@@ -393,6 +405,79 @@ function createServer(options = {}) {
       }, method));
     }
 
+    /* ── missions: the operator's work orders for the crew.
+       GET lists the stored missions with computed stats; POST creates one;
+       POST /<id>/<action> drives the lifecycle (approve, advance, deliver,
+       reopen); DELETE removes unfinished business only. Writes are
+       authenticated and CSRF-checked, and the mission model validates
+       everything: progress is recorded by the operator because this app
+       drives no execution engine — nothing here is inferred. ── */
+    if (pathname === '/api/missions' || pathname.startsWith('/api/missions/')) {
+      const isCollection = pathname === '/api/missions';
+      if (isCollection && method !== 'GET' && method !== 'POST') {
+        res.setHeader('Allow', 'GET, POST');
+        return send(res, 405, 'Method not allowed', undefined, method);
+      }
+      if (!isCollection && method !== 'POST' && method !== 'DELETE') {
+        res.setHeader('Allow', 'POST, DELETE');
+        return send(res, 405, 'Method not allowed', undefined, method);
+      }
+      const gate = requireAuth(req, res);
+      if (!gate.ok) return;
+      if (method !== 'GET' && !requireCsrf(req, res)) return;
+
+      const respond = (loaded, state, extra, status = 200) => sendJson(res, status, {
+        ok: true,
+        missions: state.missions,
+        stats: missionsLib.computeStats(state, Date.now(), missionsLib.rosterSize()),
+        source: loaded.source,
+        error: loaded.error,
+        backend: cfg.missionsStore.backend,
+        ...extra,
+      }, method);
+
+      const apply = async operation => {
+        const loaded = await cfg.missionsStore.load();
+        const state = loaded.doc || missionsLib.emptyState();
+        const result = operation(state);
+        if (!result.ok) {
+          return sendJson(res, 400, { ok: false, error: result.error, backend: cfg.missionsStore.backend }, method);
+        }
+        if (!result.doc) return respond(loaded, state, { mission: result.mission || null });
+        const saved = await cfg.missionsStore.save(result.doc);
+        if (!saved.ok) return sendJson(res, 400, { ok: false, error: saved.error }, method);
+        /* The write succeeded, so the state is now stored and any earlier
+           load complaint (e.g. a corrupt file we just overwrote) is stale. */
+        return respond({ ...loaded, source: 'stored', error: null }, saved.doc, { mission: result.mission || null });
+      };
+
+      if (isCollection && method === 'GET') {
+        return cfg.missionsStore.load().then(loaded => respond(loaded, loaded.doc || missionsLib.emptyState(), {}));
+      }
+
+      if (isCollection && method === 'POST') {
+        return readJsonBody(req)
+          .then(body => apply(state => missionsLib.createMission(state, body, Date.now())))
+          .catch(err => {
+            if (res.headersSent) return;
+            const status = String(err.message) === 'body_too_large' ? 413 : 400;
+            return sendJson(res, status, { ok: false, error: String(err.message) || 'bad_request' }, method);
+          });
+      }
+
+      const route = pathname.match(new RegExp('^/api/missions/(NX-[0-9]{1,9})(?:/([a-z]+))?$'));
+      if (!route) return sendJson(res, 404, { ok: false, error: 'not_found' }, method);
+      const [, missionId, action] = route;
+      if (method === 'DELETE') return apply(state => missionsLib.deleteMission(state, missionId));
+      const OPS = {
+        approve: state => missionsLib.approveMission(state, missionId, Date.now()),
+        advance: state => missionsLib.advanceMission(state, missionId, Date.now()),
+        deliver: state => missionsLib.deliverMission(state, missionId, Date.now()),
+        reopen: state => missionsLib.reopenMission(state, missionId, Date.now()),
+      };
+      if (!OPS[action]) return sendJson(res, 404, { ok: false, error: 'unknown mission action' }, method);
+      return apply(OPS[action]);
+    }
     /* ── authorized diagnostics (no paths, env values or tokens) ── */
     if (pathname === '/api/health/detail') {
       if (method !== 'GET') {
