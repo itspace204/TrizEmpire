@@ -34,3 +34,56 @@ jobs:
         run: npm run check --prefix trizempire
       - name: Run tests
         run: npm test --prefix trizempire
+
+  preflight:
+    name: Environment preflight
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          # The deploy root ("engines": node >=22) is what runs this script
+          # on Vercel; validate under the same major.
+          node-version: 22
+      - name: Build the deployment environment to validate
+        # Real GitHub secrets when they are configured, throwaway values
+        # otherwise — every PR still exercises the full production boot
+        # path, and a configured repo validates its actual config.
+        env:
+          CONF_SECRET: ${{ secrets.TRIZ_SESSION_SECRET }}
+          CONF_HASH: ${{ secrets.TRIZ_ADMIN_PASSWORD_HASH }}
+        run: |
+          set -euo pipefail
+          session_secret="${CONF_SECRET:-}"
+          if [ -z "$session_secret" ]; then
+            session_secret="$(openssl rand -hex 32)"
+          fi
+          admin_hash="${CONF_HASH:-}"
+          if [ -z "$admin_hash" ]; then
+            admin_hash="$(node -e "const {hashPassword}=require('./trizempire/lib/auth');process.stdout.write(hashPassword('ci-preflight-placeholder'))")"
+          fi
+          {
+            printf 'TRIZ_SESSION_SECRET=%s\n' "$session_secret"
+            printf 'TRIZ_ADMIN_PASSWORD_HASH=%s\n' "$admin_hash"
+          } > "$RUNNER_TEMP/triz-ci.env"
+      - name: Run the preflight (same script Vercel runs as buildCommand)
+        run: node scripts/check-env.js "$RUNNER_TEMP/triz-ci.env"
+      - name: Prove broken config is rejected before merge
+        run: |
+          set -euo pipefail
+          bad="$RUNNER_TEMP/triz-ci-bad.env"
+          # A plausible-looking hash but no session secret: the preflight
+          # must reject it with exit 1 (the exact code Vercel treats as
+          # "don't deploy"), not crash (2) and not pass (0).
+          printf 'TRIZ_ADMIN_PASSWORD_HASH=%s\n' 'scrypt$16384$8$1$Q2ktcHJ1bm5pbmc$placeholder' > "$bad"
+          set +e
+          node scripts/check-env.js "$bad"
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "preflight exit $code, expected 1 (a broken environment was not flagged)" >&2
+            exit 1
+          fi
+          echo "check-env: broken config correctly rejected with exit 1"

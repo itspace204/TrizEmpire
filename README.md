@@ -16,7 +16,7 @@ The Agent City board is a real 3D view of the district artwork: **scroll to zoom
 - `trizempire/vendor/` — vendored Three.js (MIT, pinned; `vendor/THREE-LICENSE.txt`).
 - `trizempire/scripts/` — `hash-password.js` (create password hashes), `check-syntax.js` (cross-platform syntax check).
 - `trizempire/tests/` — automated test suite (`node:test`, no dependencies).
-- `.github/workflows/trizempire-checks.yml` — Gitleaks + syntax + tests on Node 20/22/24.
+- `.github/workflows/trizempire-checks.yml` — Gitleaks + syntax + tests on Node 20/22/24, plus the `check-env` environment preflight (bad config fails the PR, not the deploy).
 - `deploy/` — committed deployment bundle for a Linux host: hardened systemd unit (`trizempire.service`), pm2 process file (`ecosystem.config.js`, used by Hostinger VPS-style hosts) and nginx TLS snippet (`trizempire-nginx.conf`).
 - `api/index.js` + `vercel.json` — Vercel serverless entry: the same server pipeline dispatched per request, with the static UI bundled via `includeFiles`.
 - `DEPLOYMENT.md` — production deployment guide (Linux host, Hostinger, Vercel).

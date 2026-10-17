@@ -600,6 +600,13 @@ cd trizempire && npm run check && npm test && npm start
 syntax checks and the full test suite on Node.js 20, 22 and 24 for every push
 to `main` and every pull request.
 
+The workflow's `preflight` job runs `scripts/check-env.js` — the same script
+Vercel runs as its `buildCommand` — against a validated deployment environment
+(real repo secrets `TRIZ_SESSION_SECRET`/`TRIZ_ADMIN_PASSWORD_HASH` when they
+are configured, generated throwaway values otherwise) and asserts that broken
+config is rejected with exit code 1, so a bad environment is flagged on the
+pull request instead of at deploy time.
+
 ## Known limitations
 
 - **Implemented and verified:** static delivery with CSP/security headers,
