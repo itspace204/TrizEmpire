@@ -325,6 +325,44 @@ function resolveConfig(options = {}, env = process.env) {
     throw new Error('KV_REST_API_TOKEN must be a single line of at most 512 characters.');
   }
 
+  /* ── TERMINAL (the operator shell page) ────────────────────────────
+   * The terminal spawns a real shell (bash when found, cmd.exe as the
+   * Windows fallback) and runs whatever the authenticated operator types,
+   * as the user running this server. That is the point of the page, so the
+   * knobs here are about where that is acceptable, not about sandboxing
+   * (there is none — do not expose it to a network you do not control):
+   *   - enabled by default on self-hosted installs;
+   *   - OFF by default on serverless (Vercel): a lambda must not spawn
+   *     shells into an ephemeral, read-only-ish sandbox, and per-request
+   *     cwd state cannot survive anyway. Setting TRIZ_TERMINAL_ENABLED=
+   *     true there is possible but the experience will be broken;
+   *   - TRIZ_TERMINAL_SHELL names a shell binary (bash-compatible); when
+   *     unset, bash is auto-detected (Git Bash/WSL on Windows) with cmd.exe
+   *     as the last resort. */
+  const rawTerminal = env.TRIZ_TERMINAL_ENABLED;
+  if (rawTerminal !== undefined && rawTerminal !== ''
+    && rawTerminal !== 'true' && rawTerminal !== 'false') {
+    throw new Error('TRIZ_TERMINAL_ENABLED must be true or false.');
+  }
+  const terminalEnabled = options.terminalEnabled !== undefined
+    ? options.terminalEnabled === true
+    : (rawTerminal === undefined || rawTerminal === ''
+      ? !env.VERCEL
+      : rawTerminal === 'true');
+
+  const terminalTimeoutMs = options.terminalTimeoutMs !== undefined
+    ? Number(options.terminalTimeoutMs)
+    : (readIntVar(env, 'TRIZ_TERMINAL_TIMEOUT_MS') ?? 15000);
+  if (!Number.isInteger(terminalTimeoutMs) || terminalTimeoutMs < 100 || terminalTimeoutMs > 300000) {
+    throw new Error('TRIZ_TERMINAL_TIMEOUT_MS must be an integer between 100 and 300000 (milliseconds).');
+  }
+
+  const terminalShell = options.terminalShell !== undefined ? String(options.terminalShell)
+    : String(env.TRIZ_TERMINAL_SHELL || '');
+  if (/[\0\r\n]/.test(terminalShell)) {
+    throw new Error('TRIZ_TERMINAL_SHELL must be a single line without control characters.');
+  }
+
   /* Trust the platform's forwarded client IP for rate limiting. On Vercel
    * (or behind any reverse proxy you control) every request arrives from an
    * internal address, so without this the login limiter would bucket all
@@ -359,6 +397,9 @@ function resolveConfig(options = {}, env = process.env) {
     workspacesKvToken: workspacesKvToken || null,
     sessionSecret: sessionSecret || null,
     statelessSessions: sessionSecret !== '',
+    terminalEnabled,
+    terminalTimeoutMs,
+    terminalShell: terminalShell || null,
   };
 }
 

@@ -25,6 +25,7 @@ const { supabaseSignIn, isEmailLike } = require('./lib/supabase');
 const hermesProxy = require('./lib/hermes');
 const workspacesLib = require('./lib/workspaces');
 const missionsLib = require('./lib/missions');
+const terminalLib = require('./lib/terminal');
 
 const DEFAULT_ROOT = __dirname;
 const SESSION_COOKIE = 'triz_session';
@@ -113,6 +114,17 @@ function resolveOptions(options = {}, env = process.env) {
      the platform's fetch. */
   cfg.supabaseFetch = options.supabaseFetch || undefined;
   cfg.statusLimiter = options.statusLimiter || new RateLimiter({ max: 120, windowMs: 60 * 1000 });
+  /* TERMINAL page: the shell execution engine and its own rate limit.
+     Disabled by config (serverless hosts, or TRIZ_TERMINAL_ENABLED=false);
+     when disabled the route answers 503 and no engine is ever built. */
+  cfg.terminalLimiter = options.terminalLimiter || new RateLimiter({ max: 60, windowMs: 60 * 1000 });
+  cfg.terminal = (options.terminal !== undefined ? options.terminal
+    : (cfg.terminalEnabled ? terminalLib.createTerminal({
+      timeoutMs: cfg.terminalTimeoutMs,
+      shell: cfg.terminalShell ? {
+        kind: 'custom', file: cfg.terminalShell, args: c => ['-c', c], preamble: '',
+      } : undefined,
+    }) : null));
   /* Workspace mapping store: Neon (serverless Postgres) when configured,
      else an Upstash-compatible KV store, else the local JSON file. */
   cfg.workspacesStore = options.workspacesStore || workspacesLib.createStore({
@@ -478,6 +490,75 @@ function createServer(options = {}) {
       if (!OPS[action]) return sendJson(res, 404, { ok: false, error: 'unknown mission action' }, method);
       return apply(OPS[action]);
     }
+    /* ── TERMINAL: run one shell command per request.
+       GET /api/terminal returns the session's identity/prompt facts;
+       POST /api/terminal/exec runs { command } in that session's cwd and
+       answers with the output, exit code and the (possibly cd-updated)
+       prompt facts; POST /api/terminal/reset restarts the session at $HOME.
+       Every route is authenticated, CSRF-checked and rate-limited — this
+       executes commands as the server user, so it sits behind the same
+       gates as every other mutation. Stateless sessions (Vercel) still
+       work: the client sends its session id, the server keeps the cwd. ── */
+    if (pathname === '/api/terminal' || pathname === '/api/terminal/exec'
+      || pathname === '/api/terminal/reset') {
+      if (method !== 'GET' && method !== 'POST') {
+        res.setHeader('Allow', 'GET, POST');
+        return send(res, 405, 'Method not allowed', undefined, method);
+      }
+      if (pathname === '/api/terminal' && method !== 'GET') {
+        res.setHeader('Allow', 'GET');
+        return send(res, 405, 'Method not allowed', undefined, method);
+      }
+      if (pathname !== '/api/terminal' && method !== 'POST') {
+        res.setHeader('Allow', 'POST');
+        return send(res, 405, 'Method not allowed', undefined, method);
+      }
+      if (!cfg.terminal) {
+        return sendJson(res, 503, { error: 'terminal_disabled',
+          hint: 'The terminal is unavailable on this host. Self-host to use it.' }, method);
+      }
+      const gate = requireAuth(req, res);
+      if (!gate.ok) return;
+      if (method !== 'GET' && !requireCsrf(req, res)) return;
+      const key = clientKey(req, cfg);
+      const limit = cfg.terminalLimiter.check(key);
+      if (!limit.allowed) {
+        res.setHeader('Retry-After', String(limit.retryAfterSeconds));
+        return sendJson(res, 429, { error: 'rate_limited' }, method);
+      }
+      /* The client mints a session id (one per terminal tab); it is echoed
+         back and validated here so a malformed one cannot collide with
+         another session's state or grow the map with junk keys. */
+      const sessionKey = `${key}|${
+        (String(new URL(req.url, 'http://localhost').searchParams.get('sid') || '')
+          .match(/^[A-Za-z0-9_-]{8,64}$/) || [''])[0]}`;
+      if (pathname === '/api/terminal') {
+        return sendJson(res, 200, { ok: true, ...cfg.terminal.info(sessionKey) }, method);
+      }
+      if (pathname === '/api/terminal/reset') {
+        console.log(`terminal reset ip=${key}`);
+        return sendJson(res, 200, { ok: true, ...cfg.terminal.reset(sessionKey) }, method);
+      }
+      return readJsonBody(req, 4096)
+        .then(body => cfg.terminal.exec(sessionKey, body && body.command))
+        .then(result => {
+          /* Log only metadata — command text and output may contain
+             secrets the operator typed or read; never log either. */
+          console.log(`terminal exec ip=${key} exit=${result.exitCode}`
+            + `${result.timedOut ? ' timedout=1' : ''}${result.truncated ? ' truncated=1' : ''}`);
+          return sendJson(res, 200, { ok: true, ...result }, method);
+        })
+        .catch(err => {
+          if (res.headersSent) return;
+          const message = String(err.message || '');
+          if (message === 'command_invalid') {
+            return sendJson(res, 400, { ok: false, error: message }, method);
+          }
+          const status = message === 'body_too_large' ? 413 : 400;
+          return sendJson(res, status, { ok: false, error: message || 'bad_request' }, method);
+        });
+    }
+
     /* ── authorized diagnostics (no paths, env values or tokens) ── */
     if (pathname === '/api/health/detail') {
       if (method !== 'GET') {
