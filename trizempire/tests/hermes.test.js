@@ -223,22 +223,34 @@ test('an upstream 401 is reported as unauthorized, not as a disconnected backend
   });
 });
 
-test('the session token is never sent to the public status probe', async () => {
+test('the status probe sends the session token only when one is configured', async () => {
   const tokens = [];
   await withUpstream((req, res) => {
     tokens.push(req.headers['x-hermes-session-token'] || null);
     replyJson(res, { gateway_running: true });
   }, async upstreamBase => {
+    // Configured: the token-gated public proxy requires it on EVERY path,
+    // including /api/status (direct Hermes ignores the extra header).
     await withServer(async base => {
       const res = await fetch(`${base}/api/hermes/status`);
       assert.equal(res.status, 200);
     }, {
       users: [],
       hermesBaseUrl: upstreamBase,
-      hermesSessionToken: 'should-not-travel',
+      hermesSessionToken: 'gated-proxy-token',
+    });
+    // Unconfigured: a direct Hermes serves /api/status publicly, so a
+    // caller without a token must still get a clean connected answer.
+    await withServer(async base => {
+      const res = await fetch(`${base}/api/hermes/status`);
+      assert.equal(res.status, 200);
+    }, {
+      users: [],
+      hermesBaseUrl: upstreamBase,
     });
   });
-  assert.deepEqual(tokens, [null], 'the public probe needs no credentials');
+  assert.deepEqual(tokens, ['gated-proxy-token', null],
+    'the token travels when configured and only then');
 });
 
 test('per-agent endpoint requires an authenticated session when auth is configured', async () => {

@@ -335,7 +335,7 @@ function createServer(options = {}) {
         return sendJson(res, 429, { error: 'rate_limited' });
       }
       return hermesProxy
-        .fetchStatus({ baseUrl: cfg.hermesBaseUrl, timeoutMs: cfg.hermesTimeoutMs })
+        .fetchStatus({ baseUrl: cfg.hermesBaseUrl, sessionToken: cfg.hermesSessionToken, timeoutMs: cfg.hermesTimeoutMs })
         .then(result => {
           const status = result.ok ? 200 : (result.state === 'error' ? 504 : 502);
           return sendJson(res, status, result);
@@ -573,7 +573,7 @@ function createServer(options = {}) {
       }
       const probeStarted = Date.now();
       return hermesProxy
-        .fetchStatus({ baseUrl: cfg.hermesBaseUrl, timeoutMs: cfg.hermesTimeoutMs })
+        .fetchStatus({ baseUrl: cfg.hermesBaseUrl, sessionToken: cfg.hermesSessionToken, timeoutMs: cfg.hermesTimeoutMs })
         .then(result => {
           const latencyMs = Date.now() - probeStarted;
           const cpu = process.cpuUsage();

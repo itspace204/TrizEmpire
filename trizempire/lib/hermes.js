@@ -24,9 +24,12 @@
  *   user-controlled URL or path, so this can not be used as an open proxy),
  * - per-attempt timeout, one retry on network errors,
  * - 1 MiB response cap, JSON content-type enforcement,
- * - the upstream session token is sent only to the authenticated
- *   per-profile paths (/api/profiles*, /api/memory, /api/messaging/platforms),
- *   never to the public /api/status probe, and never to browsers.
+ * - the upstream session token is sent whenever one is configured — to the
+ *   /api/status probe and the authenticated per-profile paths alike (the
+ *   token-gated public proxy scripts/hermes-public-proxy.js requires it on
+ *   EVERY path; a direct Hermes serves /api/status publicly and simply
+ *   ignores the header) — and never to browsers. With no token configured
+ *   nothing is sent, so a direct Hermes needs no credentials at all.
  *
  * Upstream auth (verified against the Hermes source):
  * - /api/status and /api/health are on Hermes' public path list; no credent-
@@ -150,11 +153,14 @@ async function fetchJson(url, timeoutMs, { sessionToken, retryDelayMs } = {}) {
   return { ok: false, state: 'disconnected', error: lastError };
 }
 
-/* Global status probe (public upstream path — deliberately no token sent). */
-async function fetchStatus({ baseUrl, timeoutMs = DEFAULT_TIMEOUT_MS, retryDelayMs = 150 } = {}) {
+/* Global status probe. The token travels only when one is configured: the
+ * token-gated public proxy requires it on every path, while a direct Hermes
+ * serves /api/status publicly and ignores the header — one behavior covers
+ * both topologies. */
+async function fetchStatus({ baseUrl, sessionToken = '', timeoutMs = DEFAULT_TIMEOUT_MS, retryDelayMs = 150 } = {}) {
   const url = normalizeBaseUrl(baseUrl);
   if (!url) return { ok: false, state: 'error', error: 'bad_upstream_config' };
-  const result = await fetchJson(url, timeoutMs, { sessionToken: undefined, retryDelayMs });
+  const result = await fetchJson(url, timeoutMs, { sessionToken: sessionToken || undefined, retryDelayMs });
   if (!result.ok) return result;
   return { ok: true, state: 'connected', status: result.body };
 }
