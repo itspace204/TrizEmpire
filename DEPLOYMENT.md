@@ -154,7 +154,7 @@ Variables):
 | `TRIZ_ADMIN_PASSWORD_HASH` | **Required.** `NODE_ENV=production` is set by Vercel, so the server refuses to start without it — there is no default password. |
 | `TRIZ_SESSION_SECRET` | **Required.** Instances share no memory, so sessions must be stateless (HMAC-signed cookies). Generate with `openssl rand -hex 32`. Read the trade-offs in the variable table: no idle timeout, no revocation before the absolute expiry. |
 | `KV_REST_API_URL` + `KV_REST_API_TOKEN` | **Recommended.** Install "Upstash Redis" from the Vercel Marketplace (has a free tier) so the workspace→agent mapping survives deploys. Without it the mapping falls back to `/tmp`, which is wiped on every deploy. |
-| `HERMES_BASE_URL` | Your Hermes dashboard's **publicly reachable** URL — see the honest limitation below. |
+| `HERMES_BASE_URL` | Your Hermes dashboard's **publicly reachable** URL — see the honest limitation below. On Vercel this is the tunnel URL that `node scripts/hermes-up.js` manages; store it as a **Config** (not Secret) variable so the helper can read it back for verification — it is a random public hostname, not a secret (`HERMES_SESSION_TOKEN` stays Secret). |
 | `HERMES_PUBLIC_URL` | Leave **unset**: visitors' browsers cannot reach your machine's loopback, so the embedded console stays off (the UI says so). |
 
 If the deployment answers **500 on every path** (dashboard title
@@ -207,9 +207,11 @@ rather than pretending:
   server-side; `127.0.0.1:9119` does not exist on Vercel. Either accept that
   the cockpit shows the gateway as offline, or expose Hermes over HTTPS
   yourself (an authenticated reverse proxy, or a tunnel such as Cloudflare
-  Tunnel) and set `HERMES_BASE_URL` to it. The upstream path allowlist still
-  applies — only `/api/status` and the token-gated `/api/profiles*` are ever
-  requested.
+  Tunnel) and set `HERMES_BASE_URL` to it — `node scripts/hermes-up.js` runs
+  exactly that chain and keeps Vercel's URL current, see
+  [Remote Hermes behind Vercel](#remote-hermes-behind-vercel-authenticated-proxy-and-tunnel).
+  The upstream path allowlist still applies — only `/api/status` and the
+  token-gated `/api/profiles*` are ever requested.
 - **Sessions and rate limits are per-instance.** Stateful sessions are
   impossible (hence `TRIZ_SESSION_SECRET`); the login limiter buckets by
   forwarded IP (`VERCEL=1` enables trust-proxy automatically) but is not
@@ -482,6 +484,74 @@ browser ── same-origin ──▶ TrizEmpire server ── HERMES_BASE_URL �
   Set `HERMES_PUBLIC_URL=` for remote deployments; the UI then shows an honest
   "console unavailable" panel instead of a broken frame.
 
+### Remote Hermes behind Vercel: authenticated proxy and tunnel
+
+Vercel's functions cannot reach `127.0.0.1:9119`, and Hermes itself refuses to
+serve a public hostname unless its OAuth gate — which only a browser can
+satisfy — sits in front of it. The answer this repository ships is an
+**authenticated reverse proxy and a tunnel in one loopback-only process**:
+
+```
+Vercel function ── HERMES_BASE_URL ──▶ Cloudflare quick tunnel   (public HTTPS)
+                                            │
+                                            ▼
+                  scripts/hermes-public-proxy.js  on  127.0.0.1:9219
+                  • every request must carry the session token
+                    (x-hermes-session-token or Bearer, timing-safe compare)
+                  • authenticated requests are forwarded with a LOOPBACK Host
+                    header; Authorization/Cookie are stripped on the way in
+                                            │  loopback only
+                                            ▼
+                  hermes dashboard  on  127.0.0.1:9119  (never leaves loopback)
+```
+
+- **Why this shape:** without the token the public hop answers `401` and
+  nothing is proxied, and the loopback `Host` keeps the dashboard in its safe
+  local mode — so Hermes' own public-exposure (OAuth) gate never engages, which
+  a server-side client could not complete anyway.
+- **One command starts the whole chain and repoints Vercel:**
+
+  ```sh
+  node scripts/hermes-up.js
+  ```
+
+  It starts `hermes dashboard` and the proxy if they are not already listening
+  (reuses them when they are), launches `cloudflared` when the previous quick
+  tunnel is gone (found in `%LOCALAPPDATA%\cloudflared` or on `PATH`), verifies
+  the public chain through the tunnel URL — **401 without the token, 200 with
+  it** — then pulls Vercel's `HERMES_BASE_URL` and only when it differs from
+  the live tunnel URL rewrites it and redeploys (`vercel --prod`), because
+  Vercel applies environment changes only to new deployments. Flags:
+  `--no-vercel` (local chain only), `--no-deploy` (update the variable, skip
+  the redeploy), `--help`. A rerun with everything healthy is a no-op.
+- **The token is the one credential.** The same value is set as
+  `HERMES_DASHBOARD_SESSION_TOKEN` when the dashboard starts, repeated in
+  `trizempire/.env` as `HERMES_SESSION_TOKEN` (consumed by the proxy and by
+  TrizEmpire's own crew endpoints), and stored in Vercel as
+  `HERMES_SESSION_TOKEN` for the serverless side — see
+  [Per-agent crew states](#per-agent-crew-states-authenticated-upstream) for
+  how it is pinned. The helper reads it from the environment or
+  `trizempire/.env` and never prints or writes it.
+- **Restart reality:** quick-tunnel URLs are per-restart. After a reboot run
+  `node scripts/hermes-up.js` again — it notices the dead tunnel, mints a new
+  URL, republishes it and redeploys automatically. While your machine (or the
+  three processes) is down, Vercel keeps the last URL and the cockpit reports
+  the gateway as `disconnected` rather than pretending.
+- **Runtime state** lives in gitignored `data/hermes-gateway.json` (last tunnel
+  URL, so a healthy tunnel is reused instead of duplicated) and
+  `data/hermes-gateway.log` (dashboard, proxy and cloudflared output — the
+  first place to look when a hop fails).
+- Manual equivalent, if you ever need the three processes without the helper:
+
+  ```sh
+  hermes dashboard                                                   # loopback :9119
+  HERMES_SESSION_TOKEN=<token> node scripts/hermes-public-proxy.js   # loopback :9219
+  cloudflared tunnel --no-autoupdate --url http://127.0.0.1:9219     # prints the URL
+  # then publish it (Config type — the helper must read it back) and redeploy:
+  #   vercel env add HERMES_BASE_URL production --type config --value <URL> --force --yes
+  #   vercel --prod
+  ```
+
 ### Per-agent crew states (authenticated upstream)
 
 `GET /api/hermes/agents` returns **facts** for every Hermes profile — session
@@ -633,7 +703,7 @@ pull request instead of at deploy time.
   scrypt+session authentication, CSRF, login rate limiting (in-memory),
   server-side Hermes status proxy with normalized states, health endpoints,
   startup environment validation with secret-safe errors, the full UI
-  (cockpit, crew command center, 3D Agent City, local console embed), 119
+  (cockpit, crew command center, 3D Agent City, local console embed), 236
   automated tests including the deployment-bundle checks (systemd, nginx,
   pm2), the Vercel serverless entry/config checks and a real-Hermes
   integration test that skips when Hermes is not running.
