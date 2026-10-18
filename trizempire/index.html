@@ -696,6 +696,21 @@ body{
 .arc-mic.bad{color:#ff6a6a;border-color:rgba(255,106,106,.45)}
 .arc-mic.bad .d{background:#ff6a6a}
 .arc-hint{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--muted-2);text-align:center}
+
+/* ── HEALTH · live diagnostics ──────────────────────────────── */
+.hl-wrap{display:flex;flex-direction:column;gap:14px}
+.hl-head{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--muted)}
+.hl-head .rule{flex:1;height:1px;background:var(--line-2)}
+.hl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px}
+.hl-card{border:1px solid var(--line-2);border-radius:12px;background:#fff;padding:14px 16px}
+.hl-card h3{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--muted);margin:0 0 10px;font-weight:600}
+.hl-row{display:flex;justify-content:space-between;gap:10px;font-family:var(--mono);font-size:11px;padding:5px 0;border-bottom:1px dashed var(--line-2)}
+.hl-row:last-child{border-bottom:0}
+.hl-row b{font-weight:600;color:#171009;text-align:right;word-break:break-word}
+.hl-pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;border-radius:999px;padding:3px 9px;border:1px solid var(--line-2);color:var(--muted)}
+.hl-pill.ok{color:var(--green);border-color:rgba(74,222,128,.4)}
+.hl-pill.bad{color:#ff6a6a;border-color:rgba(255,106,106,.45)}
+.hl-note{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;color:var(--muted-2);text-align:center}
 @media (prefers-reduced-motion: reduce){.arc-card{transition:none}.arc-card:hover{transform:none}}
 
 .placeholder-view{display:grid;place-items:center;height:70vh;text-align:center}
@@ -1103,7 +1118,7 @@ body{
   <div class="main">
     <header class="topbar">
       <div class="greet">
-        <h1>Good morning, Larry</h1>
+        <h1 id="op-greeting">Good morning, Larry</h1>
         <p>Your agentic operator system is running smoothly.</p>
       </div>
       <div class="spacer"></div>
@@ -1551,6 +1566,16 @@ body{
             </div>
             <div class="arc-hint" id="arc-hint"></div>
           </div>
+        </div>
+      </section>
+
+      <!-- ─── HEALTH — live diagnostics, honestly sourced ─── -->
+      <section class="view" id="view-health">
+        <div class="hl-wrap">
+          <div class="hl-head"><span class="t">HEALTH · LIVE DIAGNOSTICS</span><span class="rule"></span>
+            <button class="term-btn" id="hl-refresh" type="button" title="Fetch /api/health/detail now">REFRESH</button></div>
+          <div class="hl-grid" id="hl-grid"></div>
+          <div class="hl-note" id="hl-note">Waiting for the first reading…</div>
         </div>
       </section>
 
@@ -2869,8 +2894,13 @@ function showLogin(){
 }
 function hideLogin(){ authOverlay.style.display = 'none'; }
 function setOperator(name, role){
-  document.getElementById('op-name').textContent = name || 'Larry';
+  /* The greeting and the chip address the SIGNED-IN account — never a
+     fixed persona. The admin account displays as "Admin@Triz" in both;
+     any future account (operator, Supabase email) shows its own name. */
+  const display = name === 'admin' ? 'Admin@Triz' : (name || 'Larry');
+  document.getElementById('op-name').textContent = display;
   document.getElementById('op-role').textContent = String(role || 'operator').toUpperCase();
+  document.getElementById('op-greeting').textContent = `Good morning, ${display}`;
 }
 
 document.getElementById('auth-form').addEventListener('submit', async e=>{
@@ -2963,13 +2993,12 @@ const PLACEHOLDER={
   hand:["HAND MODE","Direct manipulation","Take the wheel yourself — drive the cursor and let agents observe your hand movements."],
   docs:["DOCS","Knowledge base","Documents and references your agents can retrieve from."],
   schedule:["SCHEDULE","Cron jobs","Recurring jobs that run on their own. Replies that are exactly [SILENT] stay quiet."],
-  health:["HEALTH","System health","Live CPU, RAM, disk and gateway telemetry across all profiles."],
   files:["FILES","File manager","Browse each profile's isolated workspace on disk."],
   integrations:["INTEGRATIONS","Connected services","Telegram, Discord, and the Nous Tool Gateway."],
   guide:["GUIDE","Operator guide","How to run a multi-agent engine without babysitting it."],
   settings:["SETTINGS","System settings","Model, provider, tools and telemetry preferences."],
 };
-const views={cockpit:'view-cockpit',voice:'view-voice',crew:'view-crew',city:'view-city',console:'view-console',chat:'view-chat',missions:'view-missions',terminal:'view-terminal',games:'view-games'};
+const views={cockpit:'view-cockpit',voice:'view-voice',crew:'view-crew',city:'view-city',console:'view-console',chat:'view-chat',missions:'view-missions',terminal:'view-terminal',games:'view-games',health:'view-health'};
 document.getElementById('nav').addEventListener('click',e=>{
   const item=e.target.closest('.nav-item'); if(!item)return;
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -2984,6 +3013,7 @@ document.getElementById('nav').addEventListener('click',e=>{
     if(v==='missions') window.TrizMissions?.open();  /* fresh missions + stats */
     if(v==='terminal') window.TrizTerminal?.open();  /* focus + fresh prompt facts */
     if(v==='games') window.TrizGames?.open();        /* render the lobby */
+    if(v==='health') window.TrizHealth?.refresh();   /* fresh reading on open */
   }
   else{
     const p=PLACEHOLDER[v]||["MODULE","Coming online","Part of the TrizEmpire operator system."];
@@ -2993,6 +3023,80 @@ document.getElementById('nav').addEventListener('click',e=>{
     document.getElementById('view-placeholder').classList.add('active');
   }
 });
+
+/* ══════ HEALTH — live diagnostics from /api/health/detail ══════
+ * Every figure is a measurement or a configured fact; anything the
+ * platform cannot measure says so instead of rendering a number. */
+const fmtUptime = s=>{ s=Math.max(0,Number(s)||0); const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+  return (d?d+'d ':'')+(d||h?h+'h ':'')+m+'m'; };
+const hlRow=(k,v)=>`<div class="hl-row"><span>${esc(k)}</span><b>${esc(v)}</b></div>`;
+window.TrizHealth = {
+  async refresh(){
+    const grid=document.getElementById('hl-grid');
+    const note=document.getElementById('hl-note');
+    if(!grid) return;
+    let r;
+    try{
+      r=await fetch('/api/health/detail',{cache:'no-store'});
+    }catch(e){
+      note.textContent='health detail unreachable ('+((e&&e.message)||'network')+')';
+      return;
+    }
+    const b=await r.json().catch(()=>({}));
+    if(r.status===401){ grid.innerHTML=''; note.textContent='Sign in to see live diagnostics.'; return; }
+    if(r.status===403){ grid.innerHTML=''; note.textContent='Diagnostics are admin-only — this session is not an admin.'; return; }
+    if(!r.ok){ grid.innerHTML=''; note.textContent='health detail unavailable (HTTP '+r.status+').'; return; }
+    const gwUp = b.hermes && b.hermes.state==='connected';
+    /* The status pill is the one raw-HTML row: hlRow() escapes its value on
+     * purpose, so this row is built directly (its dynamic parts are escaped). */
+    const gwStatusRow = gwUp
+      ? `<div class="hl-row"><span>Status</span><b><span class="hl-pill ok">CONNECTED · ${esc(b.hermes.latencyMs)}ms</span></b></div>`
+      : `<div class="hl-row"><span>Status</span><b><span class="hl-pill bad">${esc(((b.hermes&&b.hermes.state)||'unknown').toUpperCase())}</span></b></div>`;
+    const hostCard = b.host && b.host.available
+      ? hlRow('Load avg (1/5/15m)', (b.host.loadAverage||[]).join(' · '))
+        +hlRow('Memory total', fmtBytes(b.host.totalMemoryBytes))
+        +hlRow('Memory free', fmtBytes(b.host.freeMemoryBytes))
+      : hlRow('Host metrics', (b.host&&b.host.reason)||'not measured')
+        +hlRow('Why', 'this runtime cannot see its host');
+    const fileWarning = b.stores && b.stores.workspacesBackend==='file' && b.runtime && b.runtime.scope==='serverless-instance'
+      ? hlRow('⚠ durability', 'file store lives in /tmp — wiped on deploy') : '';
+    grid.innerHTML = `
+      <div class="hl-card"><h3>GATEWAY · HERMES</h3>
+        ${gwStatusRow}
+        ${hlRow('Configured', b.hermes&&b.hermes.configured?'yes':'no — HERMES_BASE_URL unset')}
+        ${hlRow('Target', CFG.hermesPublicUrl||'—')}
+        ${(b.hermes&&b.hermes.error)?hlRow('Last error', b.hermes.error):''}
+        ${hlRow('Probe', b.hermes?b.hermes.latencyMs+'ms round-trip':'—')}
+      </div>
+      <div class="hl-card"><h3>RUNTIME · THIS INSTANCE</h3>
+        ${hlRow('Scope', b.runtime?b.runtime.scope:'—')}
+        ${hlRow('Node', b.node||'—')}
+        ${hlRow('Uptime', fmtUptime(b.uptimeSeconds))}
+        ${hlRow('CPU since cold start', b.runtime?(b.runtime.cpuSeconds+'s'):'—')}
+        ${hlRow('Memory RSS', b.runtime?fmtBytes(b.runtime.rssBytes):'—')}
+        ${hlRow('Heap used', b.runtime?fmtBytes(b.runtime.heapUsedBytes):'—')}
+      </div>
+      <div class="hl-card"><h3>HOST · MACHINE</h3>${hostCard}</div>
+      <div class="hl-card"><h3>AUTH</h3>
+        ${hlRow('Required', b.authRequired?'yes':'no (local mode)')}
+        ${hlRow('admin account', b.auth&&b.auth.adminConfigured?'configured':'not configured')}
+        ${hlRow('operator account', b.auth&&b.auth.operatorConfigured?'configured':'not configured')}
+        ${hlRow('Supabase', b.auth&&b.auth.supabaseConfigured?'configured':'not configured')}
+        ${hlRow('Sessions', b.auth&&b.auth.statelessSessions?'stateless (shared secret)':'per-instance')}
+      </div>
+      <div class="hl-card"><h3>STORES</h3>
+        ${hlRow('Workspace store', b.stores?b.stores.workspacesBackend:'—')}
+        ${fileWarning}
+        ${hlRow('KV (Upstash)', b.stores&&b.stores.kvConfigured?'configured':'not configured')}
+        ${hlRow('Neon Postgres', b.stores&&b.stores.neonConfigured?'configured':'not configured')}
+        ${hlRow('Terminal', b.stores&&b.stores.terminalEnabled?'enabled':'disabled')}
+      </div>`;
+    note.textContent='Live from /api/health/detail · checked '+b.checkedAt+' · refreshes every 15s while this page is open.';
+  }
+};
+document.getElementById('hl-refresh')?.addEventListener('click',()=>window.TrizHealth.refresh());
+setInterval(()=>{ const v=document.getElementById('view-health');
+  if(v&&v.classList.contains('active')) window.TrizHealth.refresh(); },15000);
 
 /* Crew selection now lives in the Crew command center block above:
    selecting updates the stage, both lists and currentProfile; the

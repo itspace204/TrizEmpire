@@ -14,6 +14,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 
 const { applySecurityHeaders } = require('./lib/security');
 const {
@@ -570,14 +571,57 @@ function createServer(options = {}) {
       if (cfg.authRequired && gate.session.role !== 'admin') {
         return sendJson(res, 403, { error: 'admin_required' });
       }
+      const probeStarted = Date.now();
       return hermesProxy
         .fetchStatus({ baseUrl: cfg.hermesBaseUrl, timeoutMs: cfg.hermesTimeoutMs })
-        .then(result => sendJson(res, 200, {
-          uptimeSeconds: Math.round(process.uptime()),
-          node: process.version,
-          authRequired: cfg.authRequired,
-          hermes: { state: result.state, error: result.ok ? null : result.error },
-        }));
+        .then(result => {
+          const latencyMs = Date.now() - probeStarted;
+          const cpu = process.cpuUsage();
+          const serverless = process.env.VERCEL === '1';
+          /* Host metrics are only reported when they are genuinely measurable:
+           * a serverless platform exposes no host load or memory, so those
+           * fields say why they are absent instead of inventing values. */
+          const host = serverless
+            ? { available: false, reason: 'not exposed by the serverless platform' }
+            : {
+                available: true,
+                loadAverage: os.loadavg().map(n => Math.round(n * 100) / 100),
+                totalMemoryBytes: os.totalmem(),
+                freeMemoryBytes: os.freemem(),
+              };
+          return sendJson(res, 200, {
+            uptimeSeconds: Math.round(process.uptime()),
+            node: process.version,
+            authRequired: cfg.authRequired,
+            checkedAt: new Date().toISOString(),
+            hermes: {
+              state: result.state,
+              error: result.ok ? null : result.error,
+              configured: Boolean(cfg.hermesBaseUrl),
+              latencyMs,
+            },
+            runtime: {
+              scope: serverless ? 'serverless-instance' : 'node-process',
+              cpuSeconds: Math.round((cpu.user + cpu.system) / 1000) / 1000,
+              rssBytes: process.memoryUsage().rss,
+              heapUsedBytes: process.memoryUsage().heapUsed,
+              heapTotalBytes: process.memoryUsage().heapTotal,
+            },
+            host,
+            auth: {
+              adminConfigured: cfg.users.some(u => u.username === 'admin'),
+              operatorConfigured: cfg.users.some(u => u.username === 'operator'),
+              supabaseConfigured: Boolean(cfg.supabase),
+              statelessSessions: cfg.statelessSessions,
+            },
+            stores: {
+              workspacesBackend: cfg.workspacesStore.backend,
+              kvConfigured: Boolean(cfg.workspacesKvUrl && cfg.workspacesKvToken),
+              neonConfigured: Boolean(cfg.neon && cfg.neon.dsn),
+              terminalEnabled: cfg.terminalEnabled,
+            },
+          });
+        });
     }
 
     /* ── any other /api path is unknown (do not fall through to static) ── */

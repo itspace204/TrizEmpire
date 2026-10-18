@@ -171,8 +171,23 @@ test('diagnostics expose no filesystem paths, env values or tokens', async () =>
     assert.equal(detail.status, 200);
     const body = await detail.json();
     const keys = Object.keys(body).sort();
-    assert.deepEqual(keys, ['authRequired', 'hermes', 'node', 'uptimeSeconds']);
-    assert.ok(!JSON.stringify(body).includes('TRIZ_'));
+    /* The exact response shape is pinned on purpose: growing this endpoint
+     * must be a deliberate test edit (it was, for the HEALTH page), and the
+     * value-leak checks below decide what may travel inside those keys. */
+    assert.deepEqual(keys,
+      ['auth', 'authRequired', 'checkedAt', 'hermes', 'host', 'node',
+        'runtime', 'stores', 'uptimeSeconds']);
+    assert.deepEqual(Object.keys(body.hermes).sort(),
+      ['configured', 'error', 'latencyMs', 'state']);
+    assert.deepEqual(Object.keys(body.runtime).sort(),
+      ['cpuSeconds', 'heapTotalBytes', 'heapUsedBytes', 'rssBytes', 'scope']);
+    assert.deepEqual(Object.keys(body.stores).sort(),
+      ['kvConfigured', 'neonConfigured', 'terminalEnabled', 'workspacesBackend']);
+    const json = JSON.stringify(body);
+    assert.ok(!json.includes('TRIZ_'));
+    assert.ok(!json.includes('scrypt$'));
+    assert.ok(!json.includes('postgres://') && !json.includes('psql://'));
+    assert.ok(!/[A-Za-z]:\\/.test(json)); // no filesystem paths either
   }, authOptions());
 });
 

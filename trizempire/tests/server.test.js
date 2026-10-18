@@ -38,6 +38,33 @@ test('serves the TrizEmpire entry page', async () => {
   });
 });
 
+test('health detail reports live runtime, gateway and store facts', async () => {
+  await withServer(async base => {
+    const response = await fetch(`${base}/api/health/detail`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.node, process.version);
+    assert.equal(typeof body.uptimeSeconds, 'number');
+    assert.ok(new Date(body.checkedAt).toISOString() === body.checkedAt);
+    assert.ok(['serverless-instance', 'node-process'].includes(body.runtime.scope));
+    assert.ok(body.runtime.cpuSeconds >= 0);
+    assert.ok(body.runtime.rssBytes > 0);
+    assert.ok(typeof body.hermes.latencyMs === 'number' && body.hermes.latencyMs >= 0);
+    assert.equal(typeof body.hermes.state, 'string');
+    assert.ok(['neon', 'kv', 'file'].includes(body.stores.workspacesBackend));
+    assert.equal(typeof body.host.available, 'boolean');
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+  });
+});
+
+test('health detail rejects non-GET with an Allow header', async () => {
+  await withServer(async base => {
+    const response = await fetch(`${base}/api/health/detail`, { method: 'POST' });
+    assert.equal(response.status, 405);
+    assert.equal(response.headers.get('allow'), 'GET');
+  });
+});
+
 test('rejects methods other than GET and HEAD', async () => {
   await withServer(async base => {
     const response = await fetch(`${base}/`, { method: 'POST' });
