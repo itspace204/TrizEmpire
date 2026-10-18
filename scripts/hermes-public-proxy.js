@@ -21,6 +21,9 @@
  *   HERMES_UPSTREAM_HOST  default 127.0.0.1
  *   HERMES_UPSTREAM_PORT  default 9119
  *   PORT / argv[2]        listen port, default 9219, bound to loopback only
+ *                         (argv[2] wins over PORT; PORT=0 is rejected — a
+ *                         tunnel has to know the port, so ephemeral binds
+ *                         are never useful here)
  *
  * Point a tunnel (e.g. `cloudflared tunnel --url http://127.0.0.1:9219`)
  * at the listen port and set TrizEmpire's HERMES_BASE_URL to the tunnel URL —
@@ -37,7 +40,20 @@ if (!TOKEN) {
 }
 const UP_HOST = process.env.HERMES_UPSTREAM_HOST || '127.0.0.1';
 const UP_PORT = Number(process.env.HERMES_UPSTREAM_PORT || 9119);
-const LISTEN_PORT = Number(process.argv[2] || process.env.PORT || 9219);
+
+/* argv[2] beats PORT. PORT='0' is a truthy string, so a bare Number() cast
+ * would silently bind an ephemeral port the tunnel cannot target — reject
+ * anything that is not a real TCP port instead of binding the wrong one. */
+function listenPort() {
+  const raw = process.argv[2] || process.env.PORT || '9219';
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    console.error(`hermes-public-proxy: listen port "${raw}" is not a usable TCP port (need an integer 1–65535; 0/ephemeral is not supported — the tunnel must know the port).`);
+    process.exit(1);
+  }
+  return port;
+}
+const LISTEN_PORT = listenPort();
 
 /* Timing-safe comparison for equal-length candidates; length mismatch is
  * already a rejection, so pad nothing. */

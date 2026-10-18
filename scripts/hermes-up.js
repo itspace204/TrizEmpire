@@ -231,7 +231,9 @@ async function ensureProxy(token) {
   const started = !open.ok;
   if (started) {
     say('starting scripts/hermes-public-proxy.js …');
-    spawnDetached(process.execPath, [PROXY_SCRIPT], { HERMES_SESSION_TOKEN: token });
+    // Pass the port explicitly: an ambient PORT (e.g. 0 from a dev shell)
+    // must never redirect the proxy to an ephemeral port the tunnel cannot use.
+    spawnDetached(process.execPath, [PROXY_SCRIPT, String(PROXY.port)], { HERMES_SESSION_TOKEN: token });
   } else {
     say(`proxy already listening on ${PROXY.host}:${PROXY.port}`);
   }
