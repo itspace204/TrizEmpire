@@ -45,3 +45,5 @@ data/
 .crew-tmp/
 .voice-tmp/
 
+.vercel
+.env*

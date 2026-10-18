@@ -227,6 +227,26 @@ Local verification of the serverless entry (no Vercel account needed):
 node -e "const h=require('./api/index.js'),s=require('node:http').createServer(h);s.listen(57099,'127.0.0.1',()=>console.log('http://127.0.0.1:57099'))"
 ```
 
+### Being told when a deploy fails
+
+You do not have to watch the dashboard: **Vercel notifies the deployment's
+creator when a deployment fails — web and email are enabled by default**
+([Notifications docs](https://vercel.com/docs/notifications)). So a build
+killed by the preflight above emails you even when it was launched from a
+laptop with the CLI; CI alone cannot see those.
+
+- Where to change it: team switcher → **Settings → Account → My
+  Notifications → Deployment Failures** (toggle web/email per channel).
+- If you open the failure in the dashboard before the email goes out, no
+  email is sent — reading it counts as being told.
+- Pushes get a second, earlier signal for free: the `preflight` job in
+  [`.github/workflows/trizempire-checks.yml`](.github/workflows/trizempire-checks.yml)
+  runs the same script Vercel runs, so a bad-variable push fails the commit
+  check *before* Vercel even starts its build.
+- For chat alerts instead (Slack/Discord/Telegram), add a project webhook:
+  **Settings → Webhooks → `deployment.error`** — needs the receiving URL,
+  so it stays account-side rather than in this repo.
+
 ## Hostinger
 
 Hostinger does not run bare `node server.js` for you; pick the target that
